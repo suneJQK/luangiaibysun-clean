@@ -199,41 +199,58 @@ if st.session_state.chart_json:
         st.json(normalize_engine_chart(chart, for_ai=True))
     st.download_button("⬇️ Tải JSON lá số", json.dumps(chart, ensure_ascii=False, indent=2), "la_so_tu_vi.json", "application/json", use_container_width=True)
 
-    # Khung chat AI riêng: lịch sử chat có thanh cuộn nội bộ, không làm toàn trang
-    # bị kéo dài theo số lượng tin nhắn. Ô nhập cũng nằm ngay trong khung.
+    # Chat AI: chỉ lịch sử được cuộn; ô nhập nằm cố định ở cuối khung chat.
     st.header("③ Chat với AI")
     st.caption("AI chỉ nhận dữ liệu lập lá số đã chuẩn hóa từ engine Python local; không nhận ảnh/OCR.")
 
     st.markdown(
         """
         <style>
-        .ai-chat-title {
-            font-weight: 700;
-            margin-bottom: 6px;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-chat-frame) {
+        .ai-chat-shell {
             border: 1px solid rgba(128,128,128,.35);
             border-radius: 14px;
-            padding: 0.75rem;
+            padding: .75rem;
             background: rgba(20,20,25,.25);
+        }
+        .ai-chat-input-label {
+            font-size: .85rem;
+            font-weight: 600;
+            margin: .35rem 0 .2rem 0;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    with st.container(height=560, border=True):
-        st.markdown('<div class="ai-chat-frame"></div>', unsafe_allow_html=True)
-        if not st.session_state.chat_history:
-            st.info("Hãy đặt câu hỏi về lá số. Khung chat này có cuộn nội bộ nên bạn không cần kéo cả trang.")
-        else:
-            for msg in st.session_state.chat_history:
-                with st.chat_message(msg["role"]):
-                    st.markdown(msg["content"])
+    with st.container(border=True):
+        st.markdown('<div class="ai-chat-shell">', unsafe_allow_html=True)
 
-        q = st.chat_input("Nhập câu hỏi về lá số…", key="tuvi_ai_chat_input")
+        # Chỉ vùng lịch sử có thanh cuộn. Khi kéo lịch sử, phần nhập không di chuyển.
+        with st.container(height=455, border=False):
+            if not st.session_state.chat_history:
+                st.info("Hãy đặt câu hỏi về lá số. Lịch sử chat cuộn riêng; ô nhập luôn hiển thị ở cuối khung.")
+            else:
+                for msg in st.session_state.chat_history:
+                    with st.chat_message(msg["role"]):
+                        st.markdown(msg["content"])
 
-    if q:
+        st.markdown('<div class="ai-chat-input-label">Câu hỏi cho AI</div>', unsafe_allow_html=True)
+        with st.form("tuvi_ai_chat_form", clear_on_submit=True):
+            iq1, iq2 = st.columns([6, 1])
+            with iq1:
+                q = st.text_input(
+                    "",
+                    placeholder="Nhập câu hỏi về lá số…",
+                    label_visibility="collapsed",
+                    key="tuvi_ai_question",
+                )
+            with iq2:
+                send = st.form_submit_button("Gửi", type="primary", use_container_width=True)
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    if send and q.strip():
+        q = q.strip()
         st.session_state.chat_history.append({"role": "user", "content": q})
         try:
             with st.spinner("AI đang luận giải…"):
