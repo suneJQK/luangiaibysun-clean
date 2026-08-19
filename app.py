@@ -125,7 +125,7 @@ if st.session_state.chart_json:
                 return ""
             ten_sao = x.get("ten", "")
             dt = x.get("dac_tinh")
-            return f"{ten_sao} [{dt}]" if dt else f"{ten_sao} [CHƯA CÓ ĐẶC TÍNH]"
+            return f"{ten_sao} [{dt}]" if dt else ten_sao
         def names(xs):
             vals = [star_label(x) for x in xs if isinstance(x, dict) and x.get("ten")]
             return "; ".join(vals) or "—"
@@ -143,7 +143,7 @@ if st.session_state.chart_json:
                 "Phụ tinh": names(d.get("phu_tinh", [])),
             })
         st.dataframe(rows, use_container_width=True, hide_index=True)
-        st.caption("M = Miếu · V = Vượng · Đ = Đắc · B = Bình · H = Hãm. Nếu thấy [CHƯA CÓ ĐẶC TÍNH], dữ liệu engine chưa được gán trạng thái cho sao đó.")
+        st.caption("M = Miếu · V = Vượng · Đ = Đắc · B = Bình · H = Hãm")
     with tabs[2]:
         st.json({n: {"dai_van": d.get("dai_van", {}), "tieu_van": d.get("tieu_van", {})} for n, d in chart.get("12_cung", {}).items()})
     with tabs[3]:
