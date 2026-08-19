@@ -30,6 +30,7 @@ Phải giữ nguyên:
 - Lưu niên.
 - Lưu nguyệt.
 - Lưu nhật.
+- **Trạng thái miếu/vượng/đắc/hãm của chính tinh và sao có trạng thái được engine cung cấp.**
 
 Nếu một trường không có dữ liệu, phải coi là "không có dữ liệu", không được tự suy đoán.
 
@@ -46,7 +47,12 @@ Một cung có thể có dạng:
   "trang_sinh": "Tràng Sinh",
   "tuan": false,
   "triet": false,
-  "chinh_tinh": [],
+  "chinh_tinh": [
+    {
+      "ten": "Thiên Đồng",
+      "trang_thai": "Đắc"
+    }
+  ],
   "phu_tinh": [],
   "dai_van": null,
   "tieu_van": null,
@@ -66,15 +72,18 @@ Khi luận một cung, ưu tiên theo thứ tự:
 3. Trạng thái Tràng Sinh.
 4. Tuần/Triệt.
 5. Chính tinh.
-6. Phụ tinh.
-7. Đại vận.
-8. Tiểu vận.
-9. Lưu niên.
-10. Lưu nguyệt.
-11. Lưu nhật.
-12. Tổng hợp các yếu tố.
+6. **Trạng thái Miếu/Vượng/Đắc/Hãm của từng chính tinh nếu engine cung cấp.**
+7. Phụ tinh.
+8. Đại vận.
+9. Tiểu vận.
+10. Lưu niên.
+11. Lưu nguyệt.
+12. Lưu nhật.
+13. Tổng hợp các yếu tố.
 
 Không được bỏ qua chính tinh khi dữ liệu có chính tinh.
+
+Không được bỏ qua trạng thái Miếu/Vượng/Đắc/Hãm khi dữ liệu có trường này.
 
 Không được chỉ dựa vào phụ tinh mà bỏ qua chính tinh.
 
@@ -101,6 +110,23 @@ Nếu dữ liệu engine xác định chính tinh ở cung nào thì phải sử
 
 Không tự thay đổi vị trí chính tinh.
 
+### Trạng thái Miếu/Vượng/Đắc/Hãm
+
+Nếu engine cung cấp trạng thái của chính tinh, phải giữ nguyên và gửi cho AI theo đúng tên sao.
+
+Các giá trị cần giữ nguyên, ví dụ:
+- Miếu
+- Vượng
+- Đắc
+- Bình
+- Hãm
+
+Không tự đổi trạng thái này sang trạng thái khác.
+
+Không tự suy đoán trạng thái nếu engine không cung cấp.
+
+Khi luận chính tinh, phải kết hợp **tên sao + vị trí cung + trạng thái Miếu/Vượng/Đắc/Hãm + các sao đi cùng**, thay vì chỉ luận tên sao.
+
 ## 6. PHỤ TINH
 
 Phụ tinh chỉ được luận khi chúng xuất hiện trong dữ liệu đầu vào.
@@ -114,6 +140,8 @@ Nếu có nhiều sao cùng cung, hãy phân biệt:
 - Sao hạn.
 
 Không gộp tất cả thành một nhóm nếu dữ liệu đã phân loại.
+
+Nếu phụ tinh cũng có trạng thái Miếu/Vượng/Đắc/Hãm do engine cung cấp, giữ nguyên trạng thái đó khi gửi và khi luận.
 
 ## 7. TUẦN VÀ TRIỆT
 
@@ -154,6 +182,8 @@ Nêu đặc điểm chính của cung.
 
 ### Chính tinh
 Giải thích vai trò và ý nghĩa của từng chính tinh thực sự có trong cung.
+
+**Phải nêu trạng thái Miếu/Vượng/Đắc/Hãm của chính tinh nếu dữ liệu có.**
 
 ### Phụ tinh
 Chỉ phân tích các phụ tinh thực sự có trong dữ liệu.
@@ -197,6 +227,7 @@ Tuyệt đối không:
 - Tự tạo Đại vận.
 - Tự tạo Tiểu vận.
 - Tự tạo Lưu niên/Lưu nguyệt/Lưu nhật.
+- **Tự gán Miếu/Vượng/Đắc/Hãm khi engine không cung cấp.**
 - Tự suy đoán dữ liệu bị thiếu rồi trình bày như dữ liệu thật.
 
 Nếu thiếu dữ liệu, nói rõ:
@@ -210,6 +241,7 @@ Engine Python chịu trách nhiệm:
 - Tính Cục.
 - An sao.
 - Xác định vị trí các cung.
+- **Xác định trạng thái Miếu/Vượng/Đắc/Hãm khi engine có bảng dữ liệu tương ứng.**
 - Tính các hạn.
 
 AI chịu trách nhiệm:
@@ -233,7 +265,8 @@ Không tự sửa chính tả tên sao nếu việc sửa có thể làm thay đ
 Khi có xung đột giữa kiến thức chung và dữ liệu engine:
 
 1. Dữ liệu engine được ưu tiên để xác định vị trí.
-2. Không tự sửa dữ liệu engine.
-3. Nếu nghi ngờ dữ liệu engine sai, thông báo cho người dùng thay vì âm thầm thay đổi.
+2. Dữ liệu engine được ưu tiên để xác định trạng thái Miếu/Vượng/Đắc/Hãm nếu engine đã cung cấp.
+3. Không tự sửa dữ liệu engine.
+4. Nếu nghi ngờ dữ liệu engine sai, thông báo cho người dùng thay vì âm thầm thay đổi.
 
-Mục tiêu là: ENGINE TÍNH — AI LUẬN — KHÔNG TỰ BỊA DỮ LIỆU.
+Mục tiêu là: ENGINE TÍNH — AI NHẬN ĐỦ DỮ LIỆU — AI LUẬN — KHÔNG TỰ BỊA DỮ LIỆU.
