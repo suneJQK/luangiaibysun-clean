@@ -1,47 +1,163 @@
-from .AmDuong import *
-from .Sao import *
+# -*- coding: utf-8 -*-
+"""
+(c) 2026 nmhaaa3218 <manh.ha.3218@gmail.com>
+"""
+from .AmDuong import (
+    diaChi, dichCung, ngayThangNam, ngayThangNamCanChi, nguHanh,
+    thienCan, timCoThan, timCuc, timHoaLinh, timLuuTru,
+    timPhaToai, timThienKhoi, timThienMa, timThienQuanThienPhuc,
+    timTrangSinh, timTriet, timTuVi,
+)
+from .Sao import (
+    saoAnQuang, saoBachHo, saoBacSy, saoBatToa, saoBenh, saoBenhPhu,
+    saoCoThan, saoCuMon, saoDaiHao, saoDaLa, saoDaoHoa, saoDauQuan,
+    saoDeVuong, saoDiaGiai, saoDiaKhong, saoDiaKiep, saoDiaVong,
+    saoDieuKhach, saoDuong, saoDuongPhu, saoGiaiThan, saoHoaCai,
+    saoHoaKhoa, saoHoaKy, saoHoaLoc, saoHoaQuyen, saoHoaTinh,
+    saoHongLoan, saoHuuBat, saoHyThan, saoKiepSat, saoKinhDuong,
+    saoLamQuan, saoLiemTrinh, saoLinhTinh, saoLocTon, saoLongDuc,
+    saoLongTri, saoLucSi, saoLuuHa, saoMo, saoMocDuc, saoNguyetDuc,
+    saoPhaQuan, saoPhaToai, saoPhiLiem, saoPhongCao, saoPhucBinh,
+    saoPhucDuc, saoPhuongCac, saoQuanDoi, saoQuanPhu2, saoQuanPhu3,
+    saoQuaTu, saoQuocAn, saoSuy, saoTamThai, saoTangMon, saoTaPhu,
+    saoTauThu, saoThai, saoThaiAm, saoThaiDuong, saoThaiPhu,
+    saoThaiTue, saoThamLang, saoThanhLong, saoThatSat, saoThienCo,
+    saoThienDong, saoThienDuc, saoThienGiai, saoThienHinh, saoThienHu,
+    saoThienHy, saoThienKhoi, saoThienKhong, saoThienLa, saoThienLuong,
+    saoThienMa, saoThienPhu, saoThienPhuc, saoThienQuan, saoThienQuy,
+    saoThienRieu, saoThienSu, saoThienTai, saoThienTho, saoThienThuong,
+    saoThienTru, saoThienTuong, saoThienViet, saoThienY, saoThieuAm,
+    saoThieuDuong, saoTieuHao, saoTrangSinh, saoTrucPhu, saoTu,
+    saoTuePha, saoTuongQuan, saoTuPhu, saoTuVi, saoTuyet, saoVanKhuc,
+    saoVanTinh, saoVanXuong, saoVuKhuc,
+)
 
-def lapDiaBan(diaBan,nn,tt,nnnn,gioSinh,gioiTinh,duongLich,timeZone):
-    if duongLich: nn,tt,nnnn,_=ngayThangNam(nn,tt,nnnn,True,timeZone)
-    canThang,canNam,chiNam=ngayThangNamCanChi(nn,tt,nnnn,False,timeZone)
-    db=diaBan(tt,gioSinh,thienCan[canNam]); ad=thienCan[canNam]['amDuong']; adc=diaChi[chiNam]['amDuong']
-    cuc=nguHanh(timCuc(db.cungMenh,canNam)); cucSo=cuc['cuc']; db.nhapDaiHan(cucSo,gioiTinh*adc)
-    db.nhapTieuHan(dichCung(11,-3*(chiNam-1)),gioiTinh,chiNam)
-    tv=timTuVi(cucSo,nn); db.nhapSao(tv,saoTuVi)
-    for off,star in [(4,saoLiemTrinh),(7,saoThienDong),(8,saoVuKhuc),(9,saoThaiDuong),(11,saoThienCo)]: db.nhapSao(dichCung(tv,off),star)
-    tp=dichCung(3,3-tv)
-    for off,star in [(0,saoThienPhu),(1,saoThaiAm),(2,saoThamLang),(3,saoCuMon),(4,saoThienTuong),(5,saoThienLuong),(6,saoThatSat),(10,saoPhaQuan)]: db.nhapSao(dichCung(tp,off),star)
-    loc=thienCan[canNam]['vitriDiaBan']; db.nhapSao(loc,saoLocTon,saoBacSy)
-    adnn=gioiTinh*ad
-    for off,star in [(1,saoLucSi),(2,saoThanhLong),(3,saoTieuHao),(4,saoTuongQuan),(5,saoTauThu),(6,saoPhiLiem),(7,saoHyThan),(8,saoBenhPhu),(9,saoDaiHao),(10,saoPhucBinh),(11,saoQuanPhu2)]: db.nhapSao(dichCung(loc,off*adnn),star)
-    ttpos=chiNam
-    for off,star in [(0,saoThaiTue),(1,saoThieuDuong),(2,saoTangMon),(3,saoThieuAm),(4,saoQuanPhu3),(5,saoTuPhu),(6,saoTuePha),(7,saoLongDuc),(8,saoBachHo),(9,saoPhucDuc),(10,saoDieuKhach),(11,saoTrucPhu)]: db.nhapSao(dichCung(ttpos,off),star)
-    ts=timTrangSinh(cucSo)
-    trang=[saoTrangSinh,saoMocDuc,saoQuanDoi,saoLamQuan,saoDeVuong,saoSuy,saoBenh,saoTu,saoMo,saoTuyet,saoThai,saoDuong]
-    for i,s in enumerate(trang): db.nhapSao(dichCung(ts,(i if i<9 else i-12)*gioiTinh*ad),s)
-    db.nhapSao(dichCung(loc,-1),saoDaLa); db.nhapSao(dichCung(loc,1),saoKinhDuong)
-    dj=dichCung(11,gioSinh); db.nhapSao(dj,saoDiaKiep); db.nhapSao(dichCung(12,12-dj),saoDiaKhong)
-    h,l=timHoaLinh(chiNam,gioSinh,gioiTinh,ad); db.nhapSao(h,saoHoaTinh); db.nhapSao(l,saoLinhTinh)
-    long=dichCung(5,chiNam-1); db.nhapSao(long,saoLongTri); db.nhapSao(dichCung(2,2-long),saoPhuongCac,saoGiaiThan)
-    ta=dichCung(5,tt-1); db.nhapSao(ta,saoTaPhu); db.nhapSao(dichCung(2,2-ta),saoHuuBat)
-    vk=dichCung(5,gioSinh-1); db.nhapSao(vk,saoVanKhuc); vx=dichCung(2,2-vk); db.nhapSao(vx,saoVanXuong)
-    aq=dichCung(vx,nn-2); db.nhapSao(aq,saoAnQuang); db.nhapSao(dichCung(2,2-aq),saoThienQuy)
-    tk=timThienKhoi(canNam); db.nhapSao(tk,saoThienKhoi); db.nhapSao(dichCung(5,5-tk),saoThienViet)
-    db.nhapSao(dichCung(7,chiNam-1),saoThienHu); db.nhapSao(dichCung(7,-chiNam+1),saoThienKhoc)
-    db.nhapSao(dichCung(db.cungMenh,chiNam-1),saoThienTai); db.nhapSao(dichCung(db.cungThan,chiNam-1),saoThienTho)
-    hl=dichCung(4,-chiNam+1); db.nhapSao(hl,saoHongLoan); db.nhapSao(dichCung(hl,6),saoThienHy)
-    tq,tf=timThienQuanThienPhuc(canNam); db.nhapSao(tq,saoThienQuan); db.nhapSao(tf,saoThienPhuc)
-    th=dichCung(10,tt-1); db.nhapSao(th,saoThienHinh); db.nhapSao(dichCung(th,4),saoThienRieu,saoThienY)
-    co=timCoThan(chiNam); db.nhapSao(co,saoCoThan); db.nhapSao(dichCung(co,-4),saoQuaTu)
-    db.nhapSao(dichCung(dichCung(loc,1),2),saoVanTinh); db.nhapSao(dichCung(dichCung(loc,1),4),saoDuongPhu); db.nhapSao(dichCung(dichCung(loc,1),7),saoQuocAn)
-    db.nhapSao(dichCung(vk,2),saoThaiPhu); db.nhapSao(dichCung(vk,-2),saoPhongCao)
-    db.nhapSao(5,saoThienLa); db.nhapSao(11,saoDiaVong); db.nhapSao(db.cungNoboc,saoThienThuong); db.nhapSao(db.cungTatAch,saoThienSu)
-    ma=timThienMa(chiNam); db.nhapSao(ma,saoThienMa); db.nhapSao(dichCung(ma,2),saoHoaCai); db.nhapSao(dichCung(ma,3),saoKiepSat); db.nhapSao(dichCung(ma,7),saoDaoHoa)
-    # Phá Toái: công thức local, không phụ thuộc MCP
-    db.nhapSao(timPhaToai(chiNam),saoPhaToai)
-    dq=dichCung(chiNam,-tt+gioSinh); db.nhapSao(dq,saoDauQuan)
-    hoa={1:(dichCung(tv,4),dichCung(tp,10),dichCung(tv,8),dichCung(tv,9)),2:(dichCung(tv,11),dichCung(tp,5),tv,dichCung(tp,1)),3:(dichCung(tv,7),dichCung(tv,11),vx,dichCung(tv,4)),4:(dichCung(tp,1),dichCung(tv,7),dichCung(tv,11),dichCung(tp,3)),5:(dichCung(tp,2),dichCung(tp,1),dichCung(2,2-ta),dichCung(tv,11)),6:(dichCung(tv,8),dichCung(tp,2),dichCung(tp,5),vk),7:(dichCung(tv,9),dichCung(tv,8),dichCung(tv,7),dichCung(tp,1)),8:(dichCung(tp,3),dichCung(tv,9),vk,vx),9:(dichCung(tp,5),tv,tp,dichCung(tv,8)),10:(dichCung(tp,10),dichCung(tp,3),dichCung(tp,1),dichCung(tp,2))}[canNam]
-    for p,s in zip(hoa,[saoHoaLoc,saoHoaQuyen,saoHoaKhoa,saoHoaKy]): db.nhapSao(p,s)
-    lh,tc=timLuuTru(canNam); db.nhapSao(lh,saoLuuHa); db.nhapSao(tc,saoThienTru)
-    end=dichCung(chiNam,10-canNam); t1=dichCung(end,1); db.nhapTuan(t1,dichCung(t1,1)); tr1,tr2=timTriet(canNam); db.nhapTriet(tr1,tr2)
-    return db
+
+def lapDiaBan(diaBan, nn, tt, nnnn, gioSinh, gioiTinh, duongLich, timeZone):
+    if duongLich is True:
+        nn, tt, nnnn, thangNhuan = ngayThangNam(nn, tt, nnnn, duongLich, timeZone)
+    canThang, canNam, chiNam = ngayThangNamCanChi(nn, tt, nnnn, False, timeZone)
+    diaBan = diaBan(tt, gioSinh, thienCan[canNam])
+    amDuongNamSinh = thienCan[canNam]["amDuong"]
+    amDuongChiNamSinh = diaChi[chiNam]["amDuong"]
+    hanhCuc = timCuc(diaBan.cungMenh, canNam)
+    cuc = nguHanh(hanhCuc)
+    cucSo = cuc['cuc']
+    diaBan = diaBan.nhapDaiHan(cucSo, gioiTinh * amDuongChiNamSinh)
+    khoiHan = dichCung(11, -3 * (chiNam - 1))
+    diaBan = diaBan.nhapTieuHan(khoiHan, gioiTinh, chiNam)
+
+    viTriTuVi = timTuVi(cucSo, nn)
+    diaBan.nhapSao(viTriTuVi, saoTuVi)
+    viTriLiemTrinh = dichCung(viTriTuVi, 4); diaBan.nhapSao(viTriLiemTrinh, saoLiemTrinh)
+    viTriThienDong = dichCung(viTriTuVi, 7); diaBan.nhapSao(viTriThienDong, saoThienDong)
+    viTriVuKhuc = dichCung(viTriTuVi, 8); diaBan.nhapSao(viTriVuKhuc, saoVuKhuc)
+    vitriThaiDuong = dichCung(viTriTuVi, 9); diaBan.nhapSao(vitriThaiDuong, saoThaiDuong)
+    viTriThienCo = dichCung(viTriTuVi, 11); diaBan.nhapSao(viTriThienCo, saoThienCo)
+
+    viTriThienPhu = dichCung(3, 3 - viTriTuVi)
+    diaBan.nhapSao(viTriThienPhu, saoThienPhu)
+    viTriThaiAm = dichCung(viTriThienPhu, 1); diaBan.nhapSao(viTriThaiAm, saoThaiAm)
+    viTriThamLang = dichCung(viTriThienPhu, 2); diaBan.nhapSao(viTriThamLang, saoThamLang)
+    viTriCuMon = dichCung(viTriThienPhu, 3); diaBan.nhapSao(viTriCuMon, saoCuMon)
+    viTriThienTuong = dichCung(viTriThienPhu, 4); diaBan.nhapSao(viTriThienTuong, saoThienTuong)
+    viTriThienLuong = dichCung(viTriThienPhu, 5); diaBan.nhapSao(viTriThienLuong, saoThienLuong)
+    viTriThatSat = dichCung(viTriThienPhu, 6); diaBan.nhapSao(viTriThatSat, saoThatSat)
+    viTriPhaQuan = dichCung(viTriThienPhu, 10); diaBan.nhapSao(viTriPhaQuan, saoPhaQuan)
+
+    viTriLocTon = thienCan[canNam]['vitriDiaBan']
+    diaBan.nhapSao(viTriLocTon, saoLocTon, saoBacSy)
+    amDuongNamNu = gioiTinh * amDuongNamSinh
+    for offset, star in [(1,saoLucSi),(2,saoThanhLong),(3,saoTieuHao),(4,saoTuongQuan),(5,saoTauThu),(6,saoPhiLiem),(7,saoHyThan),(8,saoBenhPhu),(9,saoDaiHao),(10,saoPhucBinh),(11,saoQuanPhu2)]:
+        diaBan.nhapSao(dichCung(viTriLocTon, offset * amDuongNamNu), star)
+
+    viTriThaiTue = chiNam; diaBan.nhapSao(viTriThaiTue, saoThaiTue)
+    for offset, star in [(1,saoThieuDuong),(2,saoTangMon),(3,saoThieuAm),(4,saoQuanPhu3),(5,saoTuPhu),(6,saoTuePha),(7,saoLongDuc),(8,saoBachHo),(9,saoPhucDuc),(10,saoDieuKhach),(11,saoTrucPhu)]:
+        diaBan.nhapSao(dichCung(viTriThaiTue, offset), star)
+
+    viTriTrangSinh = timTrangSinh(cucSo); diaBan.nhapSao(viTriTrangSinh, saoTrangSinh)
+    for offset, star in [(1,saoMocDuc),(2,saoQuanDoi),(3,saoLamQuan),(4,saoDeVuong),(5,saoSuy),(6,saoBenh),(7,saoTu),(8,saoMo),(9,saoTuyet),(-1,saoThai),(-2,saoDuong)]:
+        diaBan.nhapSao(dichCung(viTriTrangSinh, amDuongNamNu * offset), star)
+
+    viTriDaLa = dichCung(viTriLocTon, -1); diaBan.nhapSao(viTriDaLa, saoDaLa)
+    viTriKinhDuong = dichCung(viTriLocTon, 1); diaBan.nhapSao(viTriKinhDuong, saoKinhDuong)
+    viTriDiaKiep = dichCung(11, gioSinh); diaBan.nhapSao(viTriDiaKiep, saoDiaKiep)
+    viTriDiaKhong = dichCung(12, 12 - viTriDiaKiep); diaBan.nhapSao(viTriDiaKhong, saoDiaKhong)
+    viTriHoaTinh, viTriLinhTinh = timHoaLinh(chiNam, gioSinh, gioiTinh, amDuongNamSinh)
+    diaBan.nhapSao(viTriHoaTinh, saoHoaTinh); diaBan.nhapSao(viTriLinhTinh, saoLinhTinh)
+
+    viTriLongTri = dichCung(5, chiNam - 1); diaBan.nhapSao(viTriLongTri, saoLongTri)
+    viTriPhuongCac = dichCung(2, 2 - viTriLongTri); diaBan.nhapSao(viTriPhuongCac, saoPhuongCac, saoGiaiThan)
+    viTriTaPhu = dichCung(5, tt - 1); diaBan.nhapSao(viTriTaPhu, saoTaPhu)
+    viTriHuuBat = dichCung(2, 2 - viTriTaPhu); diaBan.nhapSao(viTriHuuBat, saoHuuBat)
+    viTriVanKhuc = dichCung(5, gioSinh - 1); diaBan.nhapSao(viTriVanKhuc, saoVanKhuc)
+    viTriVanXuong = dichCung(2, 2 - viTriVanKhuc); diaBan.nhapSao(viTriVanXuong, saoVanXuong)
+    viTriTamThai = dichCung(5, tt + nn - 2); diaBan.nhapSao(viTriTamThai, saoTamThai)
+    viTriBatToa = dichCung(2, 2 - viTriTamThai); diaBan.nhapSao(viTriBatToa, saoBatToa)
+
+    viTriAnQuang = dichCung(viTriVanXuong, nn - 2); diaBan.nhapSao(viTriAnQuang, saoAnQuang)
+    viTriThienQuy = dichCung(2, 2 - viTriAnQuang); diaBan.nhapSao(viTriThienQuy, saoThienQuy)
+    viTriThienKhoi = timThienKhoi(canNam); diaBan.nhapSao(viTriThienKhoi, saoThienKhoi)
+    viTriThienViet = dichCung(5, 5 - viTriThienKhoi); diaBan.nhapSao(viTriThienViet, saoThienViet)
+    viTriThienHu = dichCung(7, chiNam - 1); diaBan.nhapSao(viTriThienHu, saoThienHu)
+    viTriThienKhoc = dichCung(7, -chiNam + 1); diaBan.nhapSao(viTriThienKhoc, saoThienKhoc)
+    viTriThienTai = dichCung(diaBan.cungMenh, chiNam - 1); diaBan.nhapSao(viTriThienTai, saoThienTai)
+    viTriThienTho = dichCung(diaBan.cungThan, chiNam - 1); diaBan.nhapSao(viTriThienTho, saoThienTho)
+    viTriHongLoan = dichCung(4, -chiNam + 1); diaBan.nhapSao(viTriHongLoan, saoHongLoan)
+    viTriThienHy = dichCung(viTriHongLoan, 6); diaBan.nhapSao(viTriThienHy, saoThienHy)
+    viTriThienQuan, viTriThienPhuc = timThienQuanThienPhuc(canNam)
+    diaBan.nhapSao(viTriThienQuan, saoThienQuan); diaBan.nhapSao(viTriThienPhuc, saoThienPhuc)
+    viTriThienHinh = dichCung(10, tt - 1); diaBan.nhapSao(viTriThienHinh, saoThienHinh)
+    viTriThienRieu = dichCung(viTriThienHinh, 4); diaBan.nhapSao(viTriThienRieu, saoThienRieu, saoThienY)
+    viTriCoThan = timCoThan(chiNam); diaBan.nhapSao(viTriCoThan, saoCoThan)
+    viTriQuaTu = dichCung(viTriCoThan, -4); diaBan.nhapSao(viTriQuaTu, saoQuaTu)
+    viTriVanTinh = dichCung(viTriKinhDuong, 2); diaBan.nhapSao(viTriVanTinh, saoVanTinh)
+    viTriDuongPhu = dichCung(viTriVanTinh, 2); diaBan.nhapSao(viTriDuongPhu, saoDuongPhu)
+    viTriQuocAn = dichCung(viTriDuongPhu, 3); diaBan.nhapSao(viTriQuocAn, saoQuocAn)
+    viTriThaiPhu = dichCung(viTriVanKhuc, 2); diaBan.nhapSao(viTriThaiPhu, saoThaiPhu)
+    viTriPhongCao = dichCung(viTriVanKhuc, -2); diaBan.nhapSao(viTriPhongCao, saoPhongCao)
+    viTriThienGiai = dichCung(9, (2 * tt) - 2); diaBan.nhapSao(viTriThienGiai, saoThienGiai)
+    viTriDiaGiai = dichCung(viTriTaPhu, 3); diaBan.nhapSao(viTriDiaGiai, saoDiaGiai)
+    diaBan.nhapSao(5, saoThienLa); diaBan.nhapSao(11, saoDiaVong)
+    diaBan.nhapSao(diaBan.cungNoboc, saoThienThuong); diaBan.nhapSao(diaBan.cungTatAch, saoThienSu)
+
+    viTriThienMa = timThienMa(chiNam); diaBan.nhapSao(viTriThienMa, saoThienMa)
+    viTriHoaCai = dichCung(viTriThienMa, 2); diaBan.nhapSao(viTriHoaCai, saoHoaCai)
+    viTriKiepSat = dichCung(viTriThienMa, 3); diaBan.nhapSao(viTriKiepSat, saoKiepSat)
+    viTriDaoHoa = dichCung(viTriKiepSat, 4); diaBan.nhapSao(viTriDaoHoa, saoDaoHoa)
+    viTriPhaToai = timPhaToai(chiNam); diaBan.nhapSao(viTriPhaToai, saoPhaToai)
+    viTriDauQuan = dichCung(chiNam, -tt + gioSinh); diaBan.nhapSao(viTriDauQuan, saoDauQuan)
+
+    if canNam == 1:
+        viTriHoaLoc, viTriHoaQuyen, viTriHoaKhoa, viTriHoaKy = viTriLiemTrinh, viTriPhaQuan, viTriVuKhuc, vitriThaiDuong
+    elif canNam == 2:
+        viTriHoaLoc, viTriHoaQuyen, viTriHoaKhoa, viTriHoaKy = viTriThienCo, viTriThienLuong, viTriTuVi, viTriThaiAm
+    elif canNam == 3:
+        viTriHoaLoc, viTriHoaQuyen, viTriHoaKhoa, viTriHoaKy = viTriThienDong, viTriThienCo, viTriVanXuong, viTriLiemTrinh
+    elif canNam == 4:
+        viTriHoaLoc, viTriHoaQuyen, viTriHoaKhoa, viTriHoaKy = viTriThaiAm, viTriThienDong, viTriThienCo, viTriCuMon
+    elif canNam == 5:
+        viTriHoaLoc, viTriHoaQuyen, viTriHoaKhoa, viTriHoaKy = viTriThamLang, viTriThaiAm, viTriHuuBat, viTriThienCo
+    elif canNam == 6:
+        viTriHoaLoc, viTriHoaQuyen, viTriHoaKhoa, viTriHoaKy = viTriVuKhuc, viTriThamLang, viTriThienLuong, viTriVanKhuc
+    elif canNam == 7:
+        viTriHoaLoc, viTriHoaQuyen, viTriHoaKhoa, viTriHoaKy = vitriThaiDuong, viTriVuKhuc, viTriThienDong, viTriThaiAm
+    elif canNam == 8:
+        viTriHoaLoc, viTriHoaQuyen, viTriHoaKhoa, viTriHoaKy = viTriCuMon, vitriThaiDuong, viTriVanKhuc, viTriVanXuong
+    elif canNam == 9:
+        viTriHoaLoc, viTriHoaQuyen, viTriHoaKhoa, viTriHoaKy = viTriThienLuong, viTriTuVi, viTriThienPhu, viTriVuKhuc
+    elif canNam == 10:
+        viTriHoaLoc, viTriHoaQuyen, viTriHoaKhoa, viTriHoaKy = viTriPhaQuan, viTriCuMon, viTriThaiAm, viTriThamLang
+
+    diaBan.nhapSao(viTriHoaLoc, saoHoaLoc)
+    diaBan.nhapSao(viTriHoaQuyen, saoHoaQuyen)
+    diaBan.nhapSao(viTriHoaKhoa, saoHoaKhoa)
+    diaBan.nhapSao(viTriHoaKy, saoHoaKy)
+    viTriLuuHa, viTriThienTru = timLuuTru(canNam)
+    diaBan.nhapSao(viTriLuuHa, saoLuuHa); diaBan.nhapSao(viTriThienTru, saoThienTru)
+    ketThucTuan = dichCung(chiNam, 10 - canNam)
+    viTriTuan1 = dichCung(ketThucTuan, 1); viTriTuan2 = dichCung(viTriTuan1, 1)
+    diaBan.nhapTuan(viTriTuan1, viTriTuan2)
+    viTriTriet1, viTriTriet2 = timTriet(canNam)
+    diaBan.nhapTriet(viTriTriet1, viTriTriet2)
+    return diaBan
