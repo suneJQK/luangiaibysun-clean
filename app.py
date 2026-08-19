@@ -15,6 +15,7 @@ st.set_page_config(page_title="Tử Vi Đẩu Số", page_icon="☯️", layout=
 BASE_DIR = Path(__file__).resolve().parent
 BOOKS_FILE = BASE_DIR / "books_cache.json"
 PROMPT_DIR = BASE_DIR / "system_prompts"
+ROOT_PROMPT_FILE = BASE_DIR / "system_prompt_tuvi.txt"
 
 def secret(n):
     try:
@@ -41,10 +42,24 @@ def load_json(p):
 
 @st.cache_data(ttl=3600)
 def load_prompt():
-    fs = sorted(PROMPT_DIR.glob("*.txt")) if PROMPT_DIR.exists() else []
+    """Nạp system prompt từ file root và các prompt bổ sung."""
+    files = []
+    if ROOT_PROMPT_FILE.exists():
+        files.append(ROOT_PROMPT_FILE)
+    if PROMPT_DIR.exists():
+        files.extend(sorted(PROMPT_DIR.glob("*.txt")))
     try:
-        return ("\n\n".join(x.read_text(encoding="utf-8").strip() for x in fs)
-                if fs else "Bạn là chuyên gia Tử Vi Đẩu Số."), None
+        parts = []
+        seen = set()
+        for p in files:
+            rp = p.resolve()
+            if rp in seen:
+                continue
+            seen.add(rp)
+            text = p.read_text(encoding="utf-8").strip()
+            if text:
+                parts.append(text)
+        return ("\n\n".join(parts) if parts else "Bạn là chuyên gia Tử Vi Đẩu Số."), None
     except Exception as e:
         return "Bạn là chuyên gia Tử Vi Đẩu Số.", str(e)
 
@@ -140,10 +155,10 @@ if st.session_state.chart_json:
                 "Tràng sinh": d.get("vong_trang_sinh") or "—",
                 "Tuần/Triệt": flags,
                 "Chính tinh": names(d.get("chinh_tinh", [])),
-                "Phụ tinh": names(d.get("phu_tinh", [])),
+                "Phụ tinh": names(d.get("sao", [])),
             })
         st.dataframe(rows, use_container_width=True, hide_index=True)
-        st.caption("M = Miếu · V = Vượng · Đ = Đắc · B = Bình · H = Hãm")
+        st.caption("M = Miếu · V = Vượng · Đ = Đắc · B = Bình · H = Hãm; sao không có đặc tính vẫn được hiển thị.")
     with tabs[2]:
         st.json({n: {"dai_van": d.get("dai_van", {}), "tieu_van": d.get("tieu_van", {})} for n, d in chart.get("12_cung", {}).items()})
     with tabs[3]:
