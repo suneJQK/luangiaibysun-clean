@@ -55,6 +55,11 @@ class Sao(object):
         return self
 
     def anCung(self, saoViTriCung):
+        """Summary
+
+        Returns:
+            TYPE: Description
+        """
         self.saoViTriCung = saoViTriCung
         return self
 
@@ -91,9 +96,9 @@ saoPhucDuc = Sao(24, "Phúc đức", "O", 5)
 saoDieuKhach = Sao(25, "Điếu khách", "H", 12)
 saoTrucPhu = Sao(26, "Trực phù", "K", 16)
 
-# Vòng Thiên can - Lộc tồn
+#  Vòng Thiên can - Lộc tồn
 saoLocTon = Sao(27, "Lộc tồn", "O", 3, "Bắc đẩu tinh", saoAmDuong=-1)
-saoBacSy = Sao(109, "Bác sỹ", "T", 5)
+saoBacSy = Sao(109, "Bác sỹ", "T", 5, )
 saoLucSi = Sao(28, "Lực sĩ", "H", 2)
 saoThanhLong = Sao(29, "Thanh long", "T", 5)
 saoTieuHao = Sao(30, "Tiểu hao", "H", 12)
@@ -121,24 +126,40 @@ saoThai = Sao(49, "Thai", "O", 14, vongTrangSinh=1)
 saoDuong = Sao(50, "Dưỡng", "M", 2, vongTrangSinh=1)
 
 # Lục sát
+#    Kình dương đà la
 saoDaLa = Sao(51, "Đà la", "K", 11, saoAmDuong=-1)
 saoKinhDuong = Sao(52, "Kình dương", "K", 11, saoAmDuong=1)
+
+#    Địa không - Địa kiếp
 saoDiaKhong = Sao(53, "Địa không", "H", 11, saoAmDuong=1)
 saoDiaKiep = Sao(54, "Địa kiếp", "H", 11, saoAmDuong=-1)
+
+#    Hỏa tinh - Linh tinh
 saoLinhTinh = Sao(55, "Linh tinh", "H", 11, saoAmDuong=-1)
 saoHoaTinh = Sao(56, "Hỏa tinh", "H", 11, saoAmDuong=1)
 
 # Sao Âm Dương
+#    Văn xương - Văn khúc
 saoVanXuong = Sao(57, "Văn xương", "K", 6, saoAmDuong=1)
 saoVanKhuc = Sao(58, "Văn Khúc", "T", 6, saoAmDuong=-1)
+
+#    Thiên khôi - Thiên Việt
 saoThienKhoi = Sao(59, "Thiên khôi", "H", 6, saoAmDuong=1)
 saoThienViet = Sao(60, "Thiên việt", "H", 6, saoAmDuong=-1)
+
+#    Tả phù - Hữu bật
 saoTaPhu = Sao(61, "Tả phù", "O", 2, saoAmDuong=1)
 saoHuuBat = Sao(62, "Hữu bật", "T", 2, saoAmDuong=-1)
+
+#    Long trì - Phượng các
 saoLongTri = Sao(63, "Long trì", "T", 3, saoAmDuong=1)
 saoPhuongCac = Sao(64, "Phượng các", "O", 3, saoAmDuong=1)
+
+#    Tam thai - Bát tọa
 saoTamThai = Sao(65, "Tam thai", "O", 7, saoAmDuong=1)
 saoBatToa = Sao(66, "Bát tọa", "O", 7, saoAmDuong=-1)
+
+#    Ân quang - Thiên quý
 saoAnQuang = Sao(67, "Ân quang", "M", 3)
 saoThienQuy = Sao(68, "Thiên quý", "O", 3)
 
