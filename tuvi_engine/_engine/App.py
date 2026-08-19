@@ -23,7 +23,7 @@ from .Sao import (
     saoTauThu, saoThai, saoThaiAm, saoThaiDuong, saoThaiPhu,
     saoThaiTue, saoThamLang, saoThanhLong, saoThatSat, saoThienCo,
     saoThienDong, saoThienDuc, saoThienGiai, saoThienHinh, saoThienHu,
-    saoThienHy, saoThienKhoi, saoThienKhong, saoThienLa, saoThienLuong,
+    saoThienHy, saoThienKhoi, saoThienKhoc, saoThienKhong, saoThienLa, saoThienLuong,
     saoThienMa, saoThienPhu, saoThienPhuc, saoThienQuan, saoThienQuy,
     saoThienRieu, saoThienSu, saoThienTai, saoThienTho, saoThienThuong,
     saoThienTru, saoThienTuong, saoThienViet, saoThienY, saoThieuAm,
