@@ -135,28 +135,78 @@ if st.session_state.chart_json:
         st.json(tb)
     with tabs[1]:
         rows = []
+
         def star_label(x):
             if not isinstance(x, dict):
                 return ""
             ten_sao = x.get("ten", "")
             dt = x.get("dac_tinh")
             return f"{ten_sao} [{dt}]" if dt else ten_sao
+
         def names(xs):
             vals = [star_label(x) for x in xs if isinstance(x, dict) and x.get("ten")]
             return "; ".join(vals) or "—"
+
         for name, d in chart.get("12_cung", {}).items():
             if not isinstance(d, dict):
                 continue
-            flags = ", ".join(x for x, ok in [("Tuần", d.get("tuan")), ("Triệt", d.get("triet"))] if ok) or "—"
+
+            flags = ", ".join(
+                x for x, ok in [("Tuần", d.get("tuan")), ("Triệt", d.get("triet"))] if ok
+            ) or "—"
+
+            # Engine đã tách chính tinh/phụ tinh. Tuyệt đối không dùng
+            # d["sao"] cho cột Phụ tinh vì d["sao"] chứa TOÀN BỘ sao,
+            # trong đó có cả chính tinh -> gây lặp chính tinh ở cột Phụ tinh.
+            chinh_tinh = d.get("chinh_tinh", [])
+            phu_tinh = d.get("phu_tinh")
+
+            # Tương thích với chart cũ: nếu chưa có phu_tinh, lấy d["sao"]
+            # nhưng loại bỏ theo ID/tên của chính tinh trước khi hiển thị.
+            if not isinstance(phu_tinh, list):
+                phu_tinh = d.get("sao", [])
+                chinh_ids = {
+                    x.get("id") for x in chinh_tinh
+                    if isinstance(x, dict) and x.get("id") is not None
+                }
+                chinh_names = {
+                    x.get("ten") for x in chinh_tinh
+                    if isinstance(x, dict) and x.get("ten")
+                }
+                phu_tinh = [
+                    x for x in phu_tinh
+                    if isinstance(x, dict)
+                    and x.get("id") not in chinh_ids
+                    and x.get("ten") not in chinh_names
+                ]
+            else:
+                # Chặn lần cuối trường hợp engine/JSON cũ vẫn đưa chính tinh
+                # vào phu_tinh. Ưu tiên ID, sau đó loại theo tên.
+                chinh_ids = {
+                    x.get("id") for x in chinh_tinh
+                    if isinstance(x, dict) and x.get("id") is not None
+                }
+                chinh_names = {
+                    x.get("ten") for x in chinh_tinh
+                    if isinstance(x, dict) and x.get("ten")
+                }
+                phu_tinh = [
+                    x for x in phu_tinh
+                    if isinstance(x, dict)
+                    and x.get("id") not in chinh_ids
+                    and x.get("ten") not in chinh_names
+                ]
+
             rows.append({
                 "Cung": name + (" (Thân cư)" if d.get("than_cu") else ""),
                 "Can-Chi": d.get("can_chi") or "—",
                 "Ngũ hành": d.get("ngu_hanh") or "—",
                 "Tràng sinh": d.get("vong_trang_sinh") or "—",
                 "Tuần/Triệt": flags,
-                "Chính tinh": names(d.get("chinh_tinh", [])),
-                "Phụ tinh": names(d.get("sao", [])),
+                "Chính tinh": names(chinh_tinh),
+                "Phụ tinh": names(phu_tinh),
             })
+
         st.dataframe(rows, use_container_width=True, hide_index=True)
         st.caption("M = Miếu · V = Vượng · Đ = Đắc · B = Bình · H = Hãm; sao không có đặc tính vẫn được hiển thị.")
     with tabs[2]:
