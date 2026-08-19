@@ -22,9 +22,10 @@ def lapDiaBan(diaBan, nn, tt, nnnn, gioSinh, gioiTinh, duongLich, timeZone):
     diaBan = diaBan.nhapTieuHan(khoiHan, gioiTinh, chiNam)
 
     viTriTuVi = timTuVi(cucSo, nn)
+    viTriLiemTrinh = dichCung(viTriTuVi, 4)
     for pos, sao in [
         (viTriTuVi, saoTuVi),
-        (dichCung(viTriTuVi, 4), saoLiemTrinh),
+        (viTriLiemTrinh, saoLiemTrinh),
         (dichCung(viTriTuVi, 7), saoThienDong),
         (dichCung(viTriTuVi, 8), saoVuKhuc),
         (dichCung(viTriTuVi, 9), saoThaiDuong),
