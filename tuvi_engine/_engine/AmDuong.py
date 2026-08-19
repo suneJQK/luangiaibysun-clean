@@ -15,14 +15,35 @@ def nguHanh(h):
     if h not in m: raise Exception('Tên Hành không hợp lệ')
     i,c,n,css=m[h]; return {'id':i,'tenHanh':{'K':'Kim','M':'Mộc','T':'Thủy','H':'Hỏa','O':'Thổ'}.get(h,h),'cuc':c,'tenCuc':n,'css':css}
 
-def nguHanhNapAm(diaChiID,canID,xuatBanMenh=False):
-    seq=['K','T','H','O','M','T','H','O','M','K','H','O','M','K','T','K','T','H','O','M','T','H','O','M','K','H','O','M','K','T']
-    # 60-cycle pair: 1 Giáp Tý
-    idx=((canID-1)*6 + ((diaChiID-canID)%12)//2)%30
-    h=seq[idx]
-    if xuatBanMenh:
-        names={'K':'Kim','T':'Thủy','H':'Hỏa','O':'Thổ','M':'Mộc'}; return names[h]
-    return h
+def nguHanhNapAm(diaChi, thienCan, xuatBanMenh=False):
+    banMenh={
+        'K1':'HẢI TRUNG KIM','T1':'GIÁNG HẠ THỦY','H1':'TÍCH LỊCH HỎA','O1':'BÍCH THƯỢNG THỔ','M1':'TANG ÐỐ MỘC',
+        'T2':'ÐẠI KHÊ THỦY','H2':'LƯ TRUNG HỎA','O2':'THÀNH ÐẦU THỔ','M2':'TÒNG BÁ MỘC','K2':'KIM BẠCH KIM',
+        'H3':'PHÚ ÐĂNG HỎA','O3':'SA TRUNG THỔ','M3':'ÐẠI LÂM MỘC','K3':'BẠCH LẠP KIM','T3':'TRƯỜNG LƯU THỦY',
+        'K4':'SA TRUNG KIM','T4':'THIÊN HÀ THỦY','H4':'THIÊN THƯỢNG HỎA','O4':'LỘ BÀN THỔ','M4':'DƯƠNG LIỄU MỘC',
+        'T5':'TRUYỀN TRUNG THỦY','H5':'SƠN HẠ HỎA','O5':'ÐẠI TRẠCH THỔ','M5':'THẠCH LỰU MỘC','K5':'KIẾM PHONG KIM',
+        'H6':'SƠN ÐẦU HỎA','O6':'ỐC THƯỢNG THỔ','M6':'BÌNH ĐỊA MỘC','K6':'XOA XUYẾN KIM','T6':'ÐẠI HẢI THỦY'}
+    matranNapAm=[
+        [0,'G','Ất','Bính','Đinh','Mậu','Kỷ','Canh','Tân','N','Q'],
+        [1,'K1',False,'T1',False,'H1',False,'O1',False,'M1',False],
+        [2,False,'K1',False,'T1',False,'H1',False,'O1',False,'M1'],
+        [3,'T2',False,'H2',False,'O2',False,'M2',False,'K2',False],
+        [4,False,'T2',False,'H2',False,'O2',False,'M2',False,'K2'],
+        [5,'H3',False,'O3',False,'M3',False,'K3',False,'T3',False],
+        [6,False,'H3',False,'O3',False,'M3',False,'K3',False,'T3'],
+        [7,'K4',False,'T4',False,'H4',False,'O4',False,'M4',False],
+        [8,False,'K4',False,'T4',False,'H4',False,'O4',False,'M4'],
+        [9,'T5',False,'H5',False,'O5',False,'M5',False,'K5',False],
+        [10,False,'T5',False,'H5',False,'O5',False,'M5',False,'K5'],
+        [11,'H6',False,'O6',False,'M6',False,'K6',False,'T6',False],
+        [12,False,'H6',False,'O6',False,'M6',False,'K6',False,'T6']]
+    try:
+        nh=matranNapAm[diaChi][thienCan]
+        if nh and isinstance(nh,str) and nh[0] in ['K','M','T','H','O']:
+            return banMenh[nh] if xuatBanMenh else nh[0]
+    except Exception:
+        pass
+    raise Exception('Không tìm được Ngũ Hành Nạp Âm')
 
 def sinhKhac(a,b):
     mat=[[None,None,None,None,None,None],[None,0,-1,1,-1j,1j],[None,-1j,0,1j,1,-1],[None,1j,1,0,1,-1j],[None,-1,1j,-1j,0,1],[None,1,-1j,-1,1j,0]]; return mat[a][b]
@@ -55,6 +76,5 @@ def timPhaToai(chiNam):
     if chiNam in (3,6,9,12): return 10
     if chiNam in (2,5,8,11): return 2
     raise Exception('Không tìm được Phá Toái')
-def timTriet(canNam):
-    return {1:(9,10),6:(9,10),2:(7,8),7:(7,8),3:(5,6),8:(5,6),4:(3,4),9:(3,4),5:(1,2),10:(1,2)}[canNam]
+def timTriet(canNam): return {1:(9,10),6:(9,10),2:(7,8),7:(7,8),3:(5,6),8:(5,6),4:(3,4),9:(3,4),5:(1,2),10:(1,2)}[canNam]
 def timLuuTru(canNam): return ([None,10,11,8,5,6,7,9,4,12,3][canNam],[None,6,7,1,6,7,9,3,7,10,11][canNam])
