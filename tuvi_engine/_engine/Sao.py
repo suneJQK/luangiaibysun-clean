@@ -50,6 +50,8 @@ class Sao(object):
         # "B": "binhHoa",
         # "H": "hamDia"
         self.saoDacTinh = dacTinh
+        # self.saoTen += " (%s)" % dacTinh
+        # self.cssSao = dt[dacTinh]
         return self
 
     def anCung(self, saoViTriCung):
