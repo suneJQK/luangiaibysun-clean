@@ -10,12 +10,14 @@ from google import genai
 from google.genai import types
 from tuvi_lap_so_engine import lap_la_so
 from tu_vi_calculator import calculate_chart
+from chart_sanitizer import normalize_engine_chart
 
 st.set_page_config(page_title="Tử Vi Đẩu Số", page_icon="☯️", layout="wide")
 BASE_DIR = Path(__file__).resolve().parent
 BOOKS_FILE = BASE_DIR / "books_cache.json"
 PROMPT_DIR = BASE_DIR / "system_prompts"
 ROOT_PROMPT_FILE = BASE_DIR / "system_prompt_tuvi.txt"
+
 
 def secret(n):
     try:
@@ -25,13 +27,16 @@ def secret(n):
         pass
     return os.environ.get(n, "") or ""
 
+
 API_KEY = secret("GEMINI_API_KEY")
+
 
 @st.cache_resource
 def get_client(k):
     if not k:
         raise ValueError("Thiếu GEMINI_API_KEY")
     return genai.Client(api_key=k)
+
 
 @st.cache_data(ttl=3600)
 def load_json(p):
@@ -40,9 +45,9 @@ def load_json(p):
     except Exception as e:
         return {}, str(e)
 
+
 @st.cache_data(ttl=3600)
 def load_prompt():
-    """Nạp system prompt từ file root và các prompt bổ sung."""
     files = []
     if ROOT_PROMPT_FILE.exists():
         files.append(ROOT_PROMPT_FILE)
@@ -63,15 +68,21 @@ def load_prompt():
     except Exception as e:
         return "Bạn là chuyên gia Tử Vi Đẩu Số.", str(e)
 
+
 books, _ = load_json(BOOKS_FILE)
 system_prompt, _ = load_prompt()
+
 
 def compact(v, limit=90000):
     s = v if isinstance(v, str) else json.dumps(v, ensure_ascii=False, separators=(",", ":"))
     return s if len(s) <= limit else s[:limit] + "..."
 
+
 def ask_ai(q, chart, calc, year):
-    prompt = f'''Năm luận: {year}\n\nCÂU HỎI:\n{q}\n\nDỮ LIỆU LÁ SỐ TỪ ENGINE PYTHON LOCAL:\n{compact(chart)}\n\nQUAN HỆ TÍNH BẰNG PYTHON:\n{compact(calc,30000)}\n\nTÀI LIỆU:\n{compact(books,40000)}\n\nChỉ diễn giải dữ liệu được cung cấp. Không đọc ảnh/OCR, không tự an sao, không tự thêm hoặc sửa sao/Can-Chi. Dùng đầy đủ chính tinh, phụ tinh, Tứ Hóa, Tràng Sinh, Tuần/Triệt, Đại vận, Tiểu vận và hạn nếu có. Trạng thái sao M/V/Đ/B/H tương ứng Miếu/Vượng/Đắc/Bình/Hãm phải được giữ nguyên theo dữ liệu engine, không tự suy diễn lại. Nếu thiếu dữ liệu thì nói rõ.'''
+    # Không gửi d["sao"] raw và không gửi boolean Tuần/Triệt cho AI.
+    # AI chỉ nhận nhóm chính tinh/phụ tinh đã chuẩn hóa từ engine.
+    ai_chart = normalize_engine_chart(chart, for_ai=True)
+    prompt = f'''Năm luận: {year}\n\nCÂU HỎI:\n{q}\n\nDỮ LIỆU LÁ SỐ ĐÃ CHUẨN HÓA TỪ ENGINE PYTHON LOCAL:\n{compact(ai_chart)}\n\nQUAN HỆ TÍNH BẰNG PYTHON:\n{compact(calc,30000)}\n\nTÀI LIỆU:\n{compact(books,40000)}\n\nChỉ diễn giải dữ liệu được cung cấp. Không đọc ảnh/OCR, không tự an sao, không tự thêm hoặc sửa sao/Can-Chi. Dùng đầy đủ chính tinh, phụ tinh, Tứ Hóa, Tràng Sinh, Tuần/Triệt, Đại vận, Tiểu vận và hạn nếu có. Trạng thái M/V/Đ/B/H phải được giữ nguyên theo dữ liệu engine. Không hiển thị tên trường raw của engine như "sao", không mô tả boolean true/false, không trích nguyên JSON engine. Nếu thiếu dữ liệu thì nói rõ.'''
     cfg = types.GenerateContentConfig(
         system_instruction=system_prompt + "\nAI chỉ diễn giải dữ liệu từ engine Python local và tuyệt đối không thay đổi dữ liệu đầu vào.",
         temperature=.2,
@@ -80,6 +91,7 @@ def ask_ai(q, chart, calc, year):
     return get_client(API_KEY).models.generate_content(
         model="gemini-3.6-flash", contents=prompt, config=cfg
     ).text
+
 
 st.session_state.setdefault("chart_json", None)
 st.session_state.setdefault("chat_history", [])
@@ -114,6 +126,7 @@ if lap:
             raise ValueError("Engine không tạo đủ 12 cung")
         chart.setdefault("input", {})["gio_hien_thi"] = gl
         chart["input"]["lich"] = lich
+        chart = normalize_engine_chart(chart)
         st.session_state.chart_json = chart
         st.session_state.chat_history = []
         st.success("Đã lập lá số và an sao bằng engine local.")
@@ -121,7 +134,8 @@ if lap:
         st.error(f"Không thể lập lá số: {type(e).__name__}: {e}")
 
 if st.session_state.chart_json:
-    chart = st.session_state.chart_json
+    chart = normalize_engine_chart(st.session_state.chart_json)
+    st.session_state.chart_json = chart
     tb = chart.get("thien_ban", {})
     st.header("② Dữ liệu lập lá số")
     m = st.columns(5)
@@ -150,53 +164,27 @@ if st.session_state.chart_json:
         for name, d in chart.get("12_cung", {}).items():
             if not isinstance(d, dict):
                 continue
-
-            flags = ", ".join(
+            flags = d.get("tuan_triet") or ", ".join(
                 x for x, ok in [("Tuần", d.get("tuan")), ("Triệt", d.get("triet"))] if ok
             ) or "—"
-
-            # Engine đã tách chính tinh/phụ tinh. Tuyệt đối không dùng
-            # d["sao"] cho cột Phụ tinh vì d["sao"] chứa TOÀN BỘ sao,
-            # trong đó có cả chính tinh -> gây lặp chính tinh ở cột Phụ tinh.
             chinh_tinh = d.get("chinh_tinh", [])
-            phu_tinh = d.get("phu_tinh")
-
-            # Tương thích với chart cũ: nếu chưa có phu_tinh, lấy d["sao"]
-            # nhưng loại bỏ theo ID/tên của chính tinh trước khi hiển thị.
-            if not isinstance(phu_tinh, list):
-                phu_tinh = d.get("sao", [])
-                chinh_ids = {
-                    x.get("id") for x in chinh_tinh
-                    if isinstance(x, dict) and x.get("id") is not None
-                }
-                chinh_names = {
-                    x.get("ten") for x in chinh_tinh
-                    if isinstance(x, dict) and x.get("ten")
-                }
-                phu_tinh = [
-                    x for x in phu_tinh
-                    if isinstance(x, dict)
-                    and x.get("id") not in chinh_ids
-                    and x.get("ten") not in chinh_names
-                ]
-            else:
-                # Chặn lần cuối trường hợp engine/JSON cũ vẫn đưa chính tinh
-                # vào phu_tinh. Ưu tiên ID, sau đó loại theo tên.
-                chinh_ids = {
-                    x.get("id") for x in chinh_tinh
-                    if isinstance(x, dict) and x.get("id") is not None
-                }
-                chinh_names = {
-                    x.get("ten") for x in chinh_tinh
-                    if isinstance(x, dict) and x.get("ten")
-                }
-                phu_tinh = [
-                    x for x in phu_tinh
-                    if isinstance(x, dict)
-                    and x.get("id") not in chinh_ids
-                    and x.get("ten") not in chinh_names
-                ]
-
+            phu_tinh = d.get("phu_tinh", [])
+            # Defense-in-depth: loại tuyệt đối 14 chính tinh khỏi phụ tinh,
+            # kể cả chart cũ/session state còn dữ liệu sai.
+            main_ids = set(range(1, 15))
+            main_names = {x.get("ten") for x in chinh_tinh if isinstance(x, dict)}
+            seen = set()
+            clean_phu = []
+            for x in phu_tinh:
+                if not isinstance(x, dict) or not x.get("ten"):
+                    continue
+                if x.get("id") in main_ids or x.get("ten") in main_names:
+                    continue
+                key = x.get("id") if x.get("id") is not None else x.get("ten")
+                if key in seen:
+                    continue
+                seen.add(key)
+                clean_phu.append(x)
             rows.append({
                 "Cung": name + (" (Thân cư)" if d.get("than_cu") else ""),
                 "Can-Chi": d.get("can_chi") or "—",
@@ -204,7 +192,7 @@ if st.session_state.chart_json:
                 "Tràng sinh": d.get("vong_trang_sinh") or "—",
                 "Tuần/Triệt": flags,
                 "Chính tinh": names(chinh_tinh),
-                "Phụ tinh": names(phu_tinh),
+                "Phụ tinh": names(clean_phu),
             })
 
         st.dataframe(rows, use_container_width=True, hide_index=True)
@@ -212,10 +200,10 @@ if st.session_state.chart_json:
     with tabs[2]:
         st.json({n: {"dai_van": d.get("dai_van", {}), "tieu_van": d.get("tieu_van", {})} for n, d in chart.get("12_cung", {}).items()})
     with tabs[3]:
-        st.json(chart)
+        st.json(normalize_engine_chart(chart, for_ai=True))
     st.download_button("⬇️ Tải JSON lá số", json.dumps(chart, ensure_ascii=False, indent=2), "la_so_tu_vi.json", "application/json", use_container_width=True)
     st.header("③ Chat với AI")
-    st.caption("AI chỉ nhận dữ liệu lập lá số từ engine Python local; không nhận ảnh/OCR.")
+    st.caption("AI chỉ nhận dữ liệu lập lá số đã chuẩn hóa từ engine Python local; không nhận ảnh/OCR.")
     for msg in st.session_state.chat_history:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
