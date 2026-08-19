@@ -79,8 +79,6 @@ def compact(v, limit=90000):
 
 
 def ask_ai(q, chart, calc, year):
-    # Không gửi d["sao"] raw và không gửi boolean Tuần/Triệt cho AI.
-    # AI chỉ nhận nhóm chính tinh/phụ tinh đã chuẩn hóa từ engine.
     ai_chart = normalize_engine_chart(chart, for_ai=True)
     prompt = f'''Năm luận: {year}\n\nCÂU HỎI:\n{q}\n\nDỮ LIỆU LÁ SỐ ĐÃ CHUẨN HÓA TỪ ENGINE PYTHON LOCAL:\n{compact(ai_chart)}\n\nQUAN HỆ TÍNH BẰNG PYTHON:\n{compact(calc,30000)}\n\nTÀI LIỆU:\n{compact(books,40000)}\n\nChỉ diễn giải dữ liệu được cung cấp. Không đọc ảnh/OCR, không tự an sao, không tự thêm hoặc sửa sao/Can-Chi. Dùng đầy đủ chính tinh, phụ tinh, Tứ Hóa, Tràng Sinh, Tuần/Triệt, Đại vận, Tiểu vận và hạn nếu có. Trạng thái M/V/Đ/B/H phải được giữ nguyên theo dữ liệu engine. Không hiển thị tên trường raw của engine như "sao", không mô tả boolean true/false, không trích nguyên JSON engine. Nếu thiếu dữ liệu thì nói rõ.'''
     cfg = types.GenerateContentConfig(
@@ -169,8 +167,6 @@ if st.session_state.chart_json:
             ) or "—"
             chinh_tinh = d.get("chinh_tinh", [])
             phu_tinh = d.get("phu_tinh", [])
-            # Defense-in-depth: loại tuyệt đối 14 chính tinh khỏi phụ tinh,
-            # kể cả chart cũ/session state còn dữ liệu sai.
             main_ids = set(range(1, 15))
             main_names = {x.get("ten") for x in chinh_tinh if isinstance(x, dict)}
             seen = set()
@@ -202,25 +198,49 @@ if st.session_state.chart_json:
     with tabs[3]:
         st.json(normalize_engine_chart(chart, for_ai=True))
     st.download_button("⬇️ Tải JSON lá số", json.dumps(chart, ensure_ascii=False, indent=2), "la_so_tu_vi.json", "application/json", use_container_width=True)
+
+    # Khung chat AI riêng: lịch sử chat có thanh cuộn nội bộ, không làm toàn trang
+    # bị kéo dài theo số lượng tin nhắn. Ô nhập cũng nằm ngay trong khung.
     st.header("③ Chat với AI")
     st.caption("AI chỉ nhận dữ liệu lập lá số đã chuẩn hóa từ engine Python local; không nhận ảnh/OCR.")
-    for msg in st.session_state.chat_history:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-    q = st.chat_input("Nhập câu hỏi về lá số…")
+
+    st.markdown(
+        """
+        <style>
+        .ai-chat-title {
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-chat-frame) {
+            border: 1px solid rgba(128,128,128,.35);
+            border-radius: 14px;
+            padding: 0.75rem;
+            background: rgba(20,20,25,.25);
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    with st.container(height=560, border=True):
+        st.markdown('<div class="ai-chat-frame"></div>', unsafe_allow_html=True)
+        if not st.session_state.chat_history:
+            st.info("Hãy đặt câu hỏi về lá số. Khung chat này có cuộn nội bộ nên bạn không cần kéo cả trang.")
+        else:
+            for msg in st.session_state.chat_history:
+                with st.chat_message(msg["role"]):
+                    st.markdown(msg["content"])
+
+        q = st.chat_input("Nhập câu hỏi về lá số…", key="tuvi_ai_chat_input")
+
     if q:
         st.session_state.chat_history.append({"role": "user", "content": q})
-        with st.chat_message("user"):
-            st.markdown(q)
-        with st.chat_message("assistant"):
-            try:
-                with st.spinner("AI đang luận giải…"):
-                    ans = ask_ai(q, chart, calculate_chart(chart), date.today().year)
-                st.markdown(ans)
-                st.session_state.chat_history.append({"role": "assistant", "content": ans})
-            except Exception as e:
-                ans = f"Không thể gọi AI: {type(e).__name__}: {e}"
-                st.error(ans)
-                st.session_state.chat_history.append({"role": "assistant", "content": ans})
+        try:
+            with st.spinner("AI đang luận giải…"):
+                ans = ask_ai(q, chart, calculate_chart(chart), date.today().year)
+        except Exception as e:
+            ans = f"Không thể gọi AI: {type(e).__name__}: {e}"
+        st.session_state.chat_history.append({"role": "assistant", "content": ans})
+        st.rerun()
 else:
     st.info("Nhập thông tin sinh và bấm LẬP LÁ SỐ. Sau đó phần Chat với AI sẽ xuất hiện.")
