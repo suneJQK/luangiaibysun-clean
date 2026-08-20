@@ -1,8 +1,4 @@
-"""Input/date normalization for the V2 engine.
-
-This module intentionally does not change astronomical/calendar rules. It only
-normalizes values before the existing deterministic engine is called.
-"""
+"""Input/date normalization and validation for the V2 engine."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -19,6 +15,11 @@ GENDER_TO_VALUE = {
     "nam": 1, "male": 1, "m": 1, "+1": 1, "1": 1,
     "nữ": -1, "nu": -1, "female": -1, "f": -1, "-1": -1, "0": -1,
 }
+
+MIN_YEAR = 1800
+MAX_YEAR = 2200
+MIN_TIMEZONE = -12.0
+MAX_TIMEZONE = 14.0
 
 
 @dataclass(frozen=True)
@@ -64,10 +65,22 @@ def parse_hour_branch(value: Any) -> int:
 
 
 def validate_date(day: int, month: int, year: int) -> None:
+    if not MIN_YEAR <= int(year) <= MAX_YEAR:
+        raise ValueError(f"Năm sinh phải nằm trong khoảng {MIN_YEAR}-{MAX_YEAR}")
     try:
-        date(year, month, day)
+        date(int(year), int(month), int(day))
     except ValueError as exc:
         raise ValueError(f"Ngày sinh không hợp lệ: {day}/{month}/{year}") from exc
+
+
+def validate_timezone(timezone: float) -> float:
+    try:
+        value = float(timezone)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("timezone phải là số") from exc
+    if not MIN_TIMEZONE <= value <= MAX_TIMEZONE:
+        raise ValueError(f"timezone phải nằm trong khoảng {MIN_TIMEZONE:g} đến {MAX_TIMEZONE:g}")
+    return value
 
 
 def normalize_birth_input(
@@ -81,8 +94,6 @@ def normalize_birth_input(
     timezone: float = 7.0,
 ) -> BirthInput:
     validate_date(day, month, year)
-    if not -12 <= float(timezone) <= 14:
-        raise ValueError("timezone phải nằm trong khoảng -12 đến +14")
     return BirthInput(
         day=int(day),
         month=int(month),
@@ -91,5 +102,5 @@ def normalize_birth_input(
         gender=parse_gender(gender),
         name=str(name or "").strip(),
         is_solar=bool(is_solar),
-        timezone=float(timezone),
+        timezone=validate_timezone(timezone),
     )
