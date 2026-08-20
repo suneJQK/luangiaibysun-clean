@@ -1,6 +1,6 @@
 [project]
 name = "tv-ai"
-version = "2.0.0"
+version = "2.2.1"
 description = "Tử Vi Đẩu Số AI powered by deterministic Python engine"
 requires-python = ">=3.11,<3.14"
 dependencies = [
@@ -8,6 +8,8 @@ dependencies = [
   "uvicorn>=0.30,<1",
   "pydantic>=2,<3",
   "google-genai>=1,<2",
+  "google-auth>=2,<3",
+  "google-api-python-client>=2,<3",
   "reportlab>=4,<5",
   "jsonschema>=4,<5",
 ]
