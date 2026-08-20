@@ -7,3 +7,5 @@ reportlab
 jsonschema
 pytest
 httpx
+google-auth
+google-api-python-client
