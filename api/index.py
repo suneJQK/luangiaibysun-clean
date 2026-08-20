@@ -31,8 +31,9 @@ ROOT_PROMPT_FILE = ROOT / "system_prompt_tuvi.txt"
 PROMPT_DIR = ROOT / "system_prompts"
 AI_MODE_DIR = ROOT / "ai_modes"
 WEB_INDEX = ROOT / "index.html"
+AI_MODE_INDEX = ROOT / "ai_mode.html"
 
-app = FastAPI(title="TV AI - Tử Vi Đẩu Số", version="2.3")
+app = FastAPI(title="TV AI - Tử Vi Đẩu Số", version="2.4")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -150,9 +151,16 @@ def root() -> FileResponse:
     return FileResponse(WEB_INDEX, media_type="text/html")
 
 
+@app.get("/ai-mode", response_class=FileResponse)
+def ai_mode_page() -> FileResponse:
+    if not AI_MODE_INDEX.exists():
+        raise HTTPException(status_code=500, detail="Thiếu ai_mode.html")
+    return FileResponse(AI_MODE_INDEX, media_type="text/html")
+
+
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"status": "ok", "service": "tv-ai", "version": "2.3"}
+    return {"status": "ok", "service": "tv-ai", "version": "2.4"}
 
 
 @app.get("/api/ai-modes")
