@@ -1,9 +1,10 @@
 import pytest
 
 from tuvi_engine.engine.cache import cached_lap_la_so, chart_cache_info, clear_chart_cache
+from tuvi_engine.engine.chart_builder import lap_la_so
 from tuvi_engine.engine.date_handler import normalize_birth_input
 from tuvi_engine.engine.geometry import palace_relations, relation
-from tuvi_engine.engine.chart_builder import lap_la_so
+from tuvi_engine.schema import validate_v2_chart
 
 
 def test_normalize_birth_input():
@@ -30,9 +31,11 @@ def test_geometry():
 
 def test_lap_la_so_schema():
     chart = lap_la_so(1, 1, 2000, "Tý", "Nam", "Test", True, 7)
-    assert chart["schema_version"] == "engine_2.1"
+    assert chart["meta"]["schema_version"] == "2.0"
+    assert chart["meta"]["engine"] == "luangiaibysun-v2"
     assert len(chart["12_cung"]) == 12
     assert "thien_ban" in chart
+    assert validate_v2_chart(chart) == []
 
 
 def test_cache_does_not_expose_mutable_state():
@@ -43,3 +46,10 @@ def test_cache_does_not_expose_mutable_state():
     chart2 = cached_lap_la_so(1, 1, 2000, 1, 1, "Test", True, 7)
     assert chart2["thien_ban"]["ten"] != "MUTATED"
     assert chart_cache_info().hits >= before + 1
+
+
+def test_schema_rejects_missing_palace():
+    chart = lap_la_so(1, 1, 2000, "Tý", "Nam", "Test", True, 7)
+    chart["12_cung"].pop(next(iter(chart["12_cung"])))
+    errors = validate_v2_chart(chart)
+    assert any("đúng 12 cung" in error for error in errors)
