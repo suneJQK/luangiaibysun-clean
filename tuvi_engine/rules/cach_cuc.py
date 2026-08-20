@@ -7,8 +7,10 @@ from tuvi_engine.data_loader import load_cach_cuc
 
 from .evaluator import (
     _normalize_names,
+    _normalize_palace_name,
     _scope_star_names,
     evaluate_condition,
+    get_cung_by_chu,
     related_palaces,
 )
 
@@ -52,14 +54,7 @@ def _evidence_for_relation(
 
 def _evidence_for_condition(chart: dict[str, Any], condition: dict[str, Any]) -> dict[str, Any]:
     target_name = str(condition.get("target", "Mệnh"))
-    target = next(
-        (
-            p for p in (chart.get("12_cung") or {}).values()
-            if isinstance(p, dict)
-            and ((p.get("cung") or p.get("cung_ten")) == target_name)
-        ),
-        None,
-    )
+    target = get_cung_by_chu(chart, target_name)
     if target is None:
         return {"target": target_name, "matched": False}
 
@@ -74,13 +69,17 @@ def _evidence_for_condition(chart: dict[str, Any], condition: dict[str, Any]) ->
         if isinstance(rule, dict):
             evidence["relations"].append(_evidence_for_relation(chart, target, relation_name, rule))
 
+    # Aliases from the TuViMCP rule vocabulary all map to Tam Phương Tứ Chính.
+    for alias in ("tam_phuong_tu_chinh_aux", "tam_phuong_tu_chinh_loc", "tam_phuong_sat", "tam_phuong_loc", "tam_phuong_ma", "tam_phuong_tuong"):
+        rule = condition.get(alias)
+        if isinstance(rule, dict):
+            evidence["relations"].append(_evidence_for_relation(chart, target, "tam_phuong_tu_chinh", rule) | {"alias": alias})
+
     if "giap_cung_pairs" in condition:
         relationships = related_palaces(chart, target)
         pair_houses = relationships["giap_cung"]
         pairs = condition.get("giap_cung_pairs")
-        pair_evidence = []
-        for palace in pair_houses:
-            pair_evidence.append(_palace_label(palace))
+        pair_evidence = [_palace_label(palace) for palace in pair_houses]
         evidence["giap_cung_pairs"] = {
             "required_pairs": pairs,
             "palaces": pair_evidence,
@@ -88,7 +87,7 @@ def _evidence_for_condition(chart: dict[str, Any], condition: dict[str, Any]) ->
 
     for key, house_name in (("cung_quan", "Quan Lộc"), ("cung_tai", "Tài Bạch"), ("cung_dien", "Điền Trạch")):
         if key in condition:
-            palace = next((p for p in (chart.get("12_cung") or {}).values() if isinstance(p, dict) and (p.get("cung") or p.get("cung_ten")) == house_name), None)
+            palace = get_cung_by_chu(chart, house_name)
             evidence[key] = {
                 "palace": _palace_label(palace) if palace else None,
                 "condition": condition[key],
