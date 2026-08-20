@@ -38,10 +38,10 @@
     {"cung_menh": {"branches_in": ["Thìn", "Tuất"], "stars_any": ["Tham Lang", "Vũ Khúc"]}, "tam_phuong_tu_chinh": {"stars_required": ["Tham Lang", "Vũ Khúc"], "min_count": 2}}
   ]},
   "35": {"giap_cung_pairs": [["Tử Vi", "Thiên Phủ"], ["Thái Dương", "Thái Âm"], ["Tả Phù", "Hữu Bật"], ["Thiên Khôi", "Thiên Việt"]]},
-  "38": {"cung_menh": {"stars_all": ["Liêm Trinh"], "branches_in": ["Thân", "Mùi"]}, "tam_phuong_tu_chinh": {"stars_none": ["Kình Dương", "Đà La", "Hỏa Tinh", "Linh Tinh"]}},
+  "38": {"cung_menh": {"stars_all": ["Liêm Trinh"], "branches_in": ["Thân", "Mùi"], "stars_none": ["Kình Dương", "Đà La", "Hỏa Tinh", "Linh Tinh"]}},
   "39": {"cung_menh": {"stars_any": ["Kình Dương", "Đà La", "Hỏa Tinh", "Linh Tinh"]}, "tam_phuong_tu_chinh": {"stars_required": ["Thất Sát"], "min_count": 1}, "tam_phuong_loc": {"stars_required": ["Hóa Lộc", "Hóa Quyền", "Lộc Tồn"], "min_count": 1}},
   "44": {"any_of": [
-    {"cung_menh": {"branches_in": ["Sửu"]}, "tam_phuong_tu_chinh": {"stars_required": ["Thái Dương", "Thái Âm"], "min_count": 2}},
-    {"cung_menh": {"branches_in": ["Mùi"]}, "tam_phuong_tu_chinh": {"stars_required": ["Thái Dương", "Thái Âm"], "min_count": 2}}
+    {"cung_menh": {"branches_in": ["Sửu"]}, "xung_chieu": {"stars_all": ["Thái Dương", "Thái Âm"]}},
+    {"cung_menh": {"branches_in": ["Mùi"]}, "xung_chieu": {"stars_all": ["Thái Dương", "Thái Âm"]}}
   ]}
 }

@@ -5,9 +5,13 @@ from typing import Any
 
 from ..ai_context import build_ai_context
 from .cach_cuc import detect_cach_cuc
+from .modifiers import detect_cach_cuc_modifiers
 
 
-def _build_cach_cuc_analysis(matched: list[dict[str, Any]]) -> dict[str, Any]:
+def _build_cach_cuc_analysis(
+    matched: list[dict[str, Any]],
+    modifiers: list[dict[str, Any]],
+) -> dict[str, Any]:
     analyses: list[dict[str, Any]] = []
     for item in matched:
         if not isinstance(item, dict):
@@ -27,6 +31,8 @@ def _build_cach_cuc_analysis(matched: list[dict[str, Any]]) -> dict[str, Any]:
                     "Ưu tiên matched_branches.evidence để xác định sao nằm ở đồng cung, "
                     "Tam Phương Tứ Chính, Xung Chiếu, Nhị Hợp hoặc Giáp Cung. "
                     "Đối chiếu tiếp với Miếu/Vượng/Đắc/Bình/Hãm và Tuần/Triệt trước khi luận. "
+                    "Sau khi xác nhận Cách Cục lõi, phải xét các modifier phá/giảm cấp. "
+                    "Không khẳng định Cách Cục là đại cát nếu có evidence phá cách tương ứng. "
                     "Không khẳng định Cách Cục nếu điều kiện không có evidence tương ứng."
                 ),
             }
@@ -34,16 +40,20 @@ def _build_cach_cuc_analysis(matched: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "matched_count": len(analyses),
         "matched": analyses,
+        "modifiers": modifiers,
         "required_in_reasoning": True,
         "evidence_first": True,
+        "separate_core_from_modifiers": True,
     }
 
 
 def analyze_chart(chart: dict[str, Any]) -> dict[str, Any]:
     result = dict(chart)
     matched = detect_cach_cuc(chart)
+    modifiers = detect_cach_cuc_modifiers(chart)
     result["cach_cuc"] = matched
-    result["cach_cuc_analysis"] = _build_cach_cuc_analysis(matched)
+    result["cach_cuc_modifiers"] = modifiers
+    result["cach_cuc_analysis"] = _build_cach_cuc_analysis(matched, modifiers)
 
     tb = chart.get("thien_ban") or {}
     result["luan_giai"] = {
@@ -64,7 +74,9 @@ def analyze_chart(chart: dict[str, Any]) -> dict[str, Any]:
 
     ai_context = build_ai_context(result)
     ai_context["cach_cuc_analysis"] = result["cach_cuc_analysis"]
+    ai_context["cach_cuc_modifiers"] = modifiers
     ai_context["reasoning_contract"]["cach_cuc_is_mandatory"] = True
     ai_context["reasoning_contract"]["cach_cuc_evidence_first"] = True
+    ai_context["reasoning_contract"]["cach_cuc_modifiers_are_mandatory"] = True
     result["ai_context"] = ai_context
     return result
