@@ -44,11 +44,8 @@ def _star_records(palace: dict[str, Any]) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     for key in ("sao", "chinh_tinh", "phu_tinh"):
         value = palace.get(key)
-        if not isinstance(value, list):
-            continue
-        for star in value:
-            if isinstance(star, dict):
-                records.append(star)
+        if isinstance(value, list):
+            records.extend(star for star in value if isinstance(star, dict))
     return records
 
 
@@ -68,9 +65,8 @@ def _star_attribute_matches(star: dict[str, Any], attr: str) -> bool:
 
 
 def _cung_so(palace: dict[str, Any]) -> int | None:
-    value = palace.get("cung_so")
     try:
-        value = int(value)
+        value = int(palace.get("cung_so"))
     except (TypeError, ValueError):
         return None
     return value if 1 <= value <= 12 else None
@@ -84,8 +80,7 @@ def _cung_chi(palace: dict[str, Any]) -> str:
     value = palace.get("dia_chi") or palace.get("chi")
     if value:
         return str(value).strip()
-    text = _cung_name(palace)
-    parts = text.split()
+    parts = _cung_name(palace).split()
     return parts[-1] if parts else ""
 
 
@@ -113,13 +108,8 @@ def _offset_palace(chart: dict[str, Any], target: dict[str, Any], offset: int) -
     base = _cung_so(target)
     if base is None:
         return []
-    return [p for p in _palaces(chart) if _cung_so(p) == ((base - 1 + offset) % 12) + 1]
-
-
-def get_tam_phuong_tu_chinh(chart: dict[str, Any], cung_so: int) -> list[dict[str, Any]]:
-    return (
-        ([p] for p in [])
-    )
+    wanted = ((base - 1 + offset) % 12) + 1
+    return [p for p in _palaces(chart) if _cung_so(p) == wanted]
 
 
 def related_palaces(chart: dict[str, Any], target: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
@@ -129,15 +119,12 @@ def related_palaces(chart: dict[str, Any], target: dict[str, Any]) -> dict[str, 
     xung = _offset_palace(chart, target, 6)
     giap = _offset_palace(chart, target, -1) + _offset_palace(chart, target, 1)
     tam_phuong = dong + tam_hop + xung
-
     luc_hop = []
-    chi = _cung_chi(target)
-    partner = BRANCH_LUC_HOP.get(chi)
+    partner = BRANCH_LUC_HOP.get(_cung_chi(target))
     if partner:
         found = get_cung_by_chi(chart, partner)
         if found is not None:
             luc_hop = [found]
-
     return {
         "dong_cung": dong,
         "tam_hop": tam_hop,
@@ -148,8 +135,29 @@ def related_palaces(chart: dict[str, Any], target: dict[str, Any]) -> dict[str, 
     }
 
 
+def get_tam_phuong_tu_chinh(chart: dict[str, Any], cung_so: int) -> list[dict[str, Any]]:
+    target = get_cung_by_so(chart, cung_so)
+    return related_palaces(chart, target)["tam_phuong_tu_chinh"] if target else []
+
+
+def get_giap_cung(chart: dict[str, Any], cung_so: int) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    target = get_cung_by_so(chart, cung_so)
+    if target is None:
+        return None, None
+    rel = related_palaces(chart, target)["giap_cung"]
+    return (rel[0] if len(rel) > 0 else None, rel[1] if len(rel) > 1 else None)
+
+
+def get_luc_hop_cung(chart: dict[str, Any], cung_so: int) -> dict[str, Any] | None:
+    target = get_cung_by_so(chart, cung_so)
+    if target is None:
+        return None
+    rel = related_palaces(chart, target)["nhi_hop"]
+    return rel[0] if rel else None
+
+
 def has_star(palace: dict[str, Any] | None, star_name: str, star_attr: str | None = None) -> bool:
-    if not palace:
+    if palace is None:
         return False
     target = str(star_name).strip().casefold()
     for star in _star_records(palace):
@@ -162,36 +170,7 @@ def has_star(palace: dict[str, Any] | None, star_name: str, star_attr: str | Non
 
 
 def count_stars_in_houses(houses: list[dict[str, Any]], star_names: list[str]) -> int:
-    count = 0
-    for name in star_names:
-        if any(has_star(h, name) for h in houses):
-            count += 1
-    return count
-
-
-def _scope_matches(scope: list[dict[str, Any]], condition: dict[str, Any]) -> bool:
-    if "stars_all" in condition:
-        required = _normalize_names(condition["stars_all"])
-        if not required.issubset(_scope_star_names(scope)):
-            return False
-    if "stars_any" in condition:
-        requested = _normalize_names(condition["stars_any"])
-        if not (requested & _scope_star_names(scope)):
-            return False
-    if "stars_none" in condition:
-        forbidden = _normalize_names(condition["stars_none"])
-        if forbidden & _scope_star_names(scope):
-            return False
-    if "not_both" in condition:
-        pair = _normalize_names(condition["not_both"])
-        if pair and pair.issubset(_scope_star_names(scope)):
-            return False
-    if "stars_required" in condition:
-        required = _normalize_names(condition["stars_required"])
-        min_count = int(condition.get("min_count", len(required)))
-        if len(required & _scope_star_names(scope)) < min_count:
-            return False
-    return True
+    return sum(1 for name in star_names if any(has_star(house, name) for house in houses))
 
 
 def _scope_star_names(houses: list[dict[str, Any]]) -> set[str]:
@@ -199,6 +178,24 @@ def _scope_star_names(houses: list[dict[str, Any]]) -> set[str]:
     for house in houses:
         result |= _star_names(house)
     return result
+
+
+def _scope_matches(scope: list[dict[str, Any]], condition: dict[str, Any]) -> bool:
+    stars = _scope_star_names(scope)
+    if "stars_all" in condition and not _normalize_names(condition["stars_all"]).issubset(stars):
+        return False
+    if "stars_any" in condition and not (_normalize_names(condition["stars_any"]) & stars):
+        return False
+    if "stars_none" in condition and (_normalize_names(condition["stars_none"]) & stars):
+        return False
+    if "not_both" in condition and _normalize_names(condition["not_both"]).issubset(stars):
+        return False
+    if "stars_required" in condition:
+        required = _normalize_names(condition["stars_required"])
+        min_count = int(condition.get("min_count", len(required)))
+        if len(required & stars) < min_count:
+            return False
+    return True
 
 
 def _match_house_condition(palace: dict[str, Any] | None, condition: dict[str, Any]) -> bool:
@@ -221,24 +218,21 @@ def evaluate_condition(chart: dict[str, Any], condition: dict[str, Any]) -> bool
     """Evaluate one declarative condition against real palace geometry."""
     if not isinstance(condition, dict):
         return False
-
     if "any_of" in condition:
         branches = [x for x in condition["any_of"] if isinstance(x, dict)]
         return any(evaluate_condition(chart, x) for x in branches)
     if "all_of" in condition:
         branches = [x for x in condition["all_of"] if isinstance(x, dict)]
         return bool(branches) and all(evaluate_condition(chart, x) for x in branches)
-
     if "cung_menh" in condition:
         return evaluate_condition(chart, {"target": "Mệnh", **condition["cung_menh"]})
 
     target = get_cung_by_chu(chart, str(condition.get("target", "Mệnh")))
     if target is None:
         return False
-
-    # Explicit relation blocks: each one is independently checked on its actual scope.
     relations = related_palaces(chart, target)
     relation_present = False
+
     for relation_name in RELATION_KEYS:
         rule = condition.get(relation_name)
         if rule is None:
@@ -249,30 +243,25 @@ def evaluate_condition(chart: dict[str, Any], condition: dict[str, Any]) -> bool
             return False
         if rule is True:
             continue
-        if not isinstance(rule, dict):
-            return False
-        if not _scope_matches(scope, rule):
+        if not isinstance(rule, dict) or not _scope_matches(scope, rule):
             return False
 
-    # Explicit Giáp Cung pair predicate: one star on each side.
     if "giap_cung_pairs" in condition:
         relation_present = True
-        left, right = relations["giap_cung"][0:1], relations["giap_cung"][1:2]
-        if not left or not right:
+        pair_houses = relations["giap_cung"]
+        if len(pair_houses) != 2:
             return False
-        pairs = condition["giap_cung_pairs"]
         matched = False
-        for pair in pairs if isinstance(pairs, list) else []:
+        for pair in condition["giap_cung_pairs"] if isinstance(condition["giap_cung_pairs"], list) else []:
             if not isinstance(pair, (list, tuple)) or len(pair) != 2:
                 continue
             a, b = pair
-            if (has_star(left[0], a) and has_star(right[0], b)) or (has_star(left[0], b) and has_star(right[0], a)):
+            if (has_star(pair_houses[0], a) and has_star(pair_houses[1], b)) or (has_star(pair_houses[0], b) and has_star(pair_houses[1], a)):
                 matched = True
                 break
         if not matched:
             return False
 
-    # Existing TuViMCP-style specialized scopes.
     for key, house_name in (("cung_quan", "Quan Lộc"), ("cung_tai", "Tài Bạch"), ("cung_dien", "Điền Trạch")):
         if key in condition:
             relation_present = True
@@ -287,23 +276,18 @@ def evaluate_condition(chart: dict[str, Any], condition: dict[str, Any]) -> bool
 
     if "luc_hop" in condition:
         relation_present = True
-        scope = relations["nhi_hop"]
-        if not scope or not _match_house_condition(scope[0], condition["luc_hop"]):
+        partner = relations["nhi_hop"]
+        if not partner or not _match_house_condition(partner[0], condition["luc_hop"]):
             return False
 
-    # Direct target-house filters are always about the target itself.
-    target_filters = {
-        k: condition[k]
-        for k in ("branches_in", "stars_all", "stars_any", "stars_none", "not_both")
-        if k in condition
-    }
+    target_filters = {k: condition[k] for k in ("branches_in", "stars_all", "stars_any", "stars_none", "not_both") if k in condition}
     if target_filters and not _match_house_condition(target, target_filters):
         return False
 
     if "stem_contains" in condition:
+        relation_present = True
         can_nam = str((chart.get("thien_ban") or {}).get("can_nam") or "")
         if str(condition["stem_contains"]) not in can_nam:
             return False
 
-    # A relation-only condition is valid once the relation predicate(s) matched.
-    return relation_present or bool(target_filters) or "stem_contains" in condition
+    return relation_present or bool(target_filters)
