@@ -1,0 +1,29 @@
+name: V2 CI
+
+on:
+  push:
+    branches: [main, update/v2-engine]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+      - name: Export star catalog
+        run: python scripts/export_star_catalog.py
+      - name: Validate star catalog
+        run: python - <<'PY'
+import json
+p=json.load(open('data/stars.json', encoding='utf-8'))
+assert p['count'] >= 100
+assert len(p['stars']) == p['count']
+PY
+      - name: Run tests
+        run: pytest -q
