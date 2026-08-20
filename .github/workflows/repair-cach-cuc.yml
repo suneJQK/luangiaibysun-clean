@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   repair:
-    if: ${{ contains(github.event.head_commit.message, 'add deterministic repair map') }}
+    if: ${{ contains(github.event.head_commit.message, 'repair trigger') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
