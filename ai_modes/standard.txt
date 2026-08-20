@@ -1,0 +1,7 @@
+Tên chế độ: Luận giải tổng hợp
+Mục tiêu: Luận giải cân bằng, có cấu trúc, ưu tiên độ chính xác dữ liệu và tổng hợp nhiều yếu tố.
+Yêu cầu:
+- Phân tích đúng trọng tâm câu hỏi.
+- Khi cần, đối chiếu Đồng cung, Tam Hợp, Xung Chiếu, Nhị Hợp, Giáp Cung, Tuần/Triệt.
+- Phân biệt rõ chính tinh, phụ tinh, sao hạn và các tầng vận hạn.
+- Kết luận theo mức độ ảnh hưởng, không liệt kê rời rạc.
