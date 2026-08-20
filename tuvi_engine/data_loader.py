@@ -24,4 +24,20 @@ def load_engine_config() -> dict[str, Any]:
 
 def load_cach_cuc() -> list[dict[str, Any]]:
     data = load_json("data/cach_cuc.json")
-    return data if isinstance(data, list) else []
+    if not isinstance(data, list):
+        return []
+
+    # Keep the rich source file intact while allowing verified rule corrections
+    # to be versioned separately and applied deterministically at runtime.
+    overrides = load_json("data/cach_cuc_overrides.json")
+    if isinstance(overrides, dict):
+        merged: list[dict[str, Any]] = []
+        for item in data:
+            current = dict(item)
+            replacement = overrides.get(str(item.get("id")))
+            if isinstance(replacement, dict):
+                current["conditions"] = replacement
+            merged.append(current)
+        return merged
+
+    return data
