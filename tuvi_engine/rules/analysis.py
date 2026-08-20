@@ -20,17 +20,23 @@ def _build_cach_cuc_analysis(matched: list[dict[str, Any]]) -> dict[str, Any]:
                 "description": item.get("description"),
                 "reason": item.get("reason"),
                 "conditions": item.get("conditions", {}),
-                "binh_chu": item.get("binh_chu", ""),
-                "uu_khuyet_diem": item.get("uu_khuyet_diem", ""),
+                "matched_branches": item.get("matched_branches", []),
+                "interpretation": item.get("interpretation", {}),
                 "ai_instruction": (
                     "Dùng Cách Cục này như một kết luận có bằng chứng. "
-                    "Đối chiếu với sao đồng cung, Tam Hợp, Xung Chiếu, Nhị Hợp, "
-                    "Giáp Cung và Tuần/Triệt trước khi luận; không khẳng định "
-                    "ngoài điều kiện đã được match."
+                    "Ưu tiên matched_branches.evidence để xác định sao nằm ở đồng cung, "
+                    "Tam Phương Tứ Chính, Xung Chiếu, Nhị Hợp hoặc Giáp Cung. "
+                    "Đối chiếu tiếp với Miếu/Vượng/Đắc/Bình/Hãm và Tuần/Triệt trước khi luận. "
+                    "Không khẳng định Cách Cục nếu điều kiện không có evidence tương ứng."
                 ),
             }
         )
-    return {"matched_count": len(analyses), "matched": analyses, "required_in_reasoning": True}
+    return {
+        "matched_count": len(analyses),
+        "matched": analyses,
+        "required_in_reasoning": True,
+        "evidence_first": True,
+    }
 
 
 def analyze_chart(chart: dict[str, Any]) -> dict[str, Any]:
