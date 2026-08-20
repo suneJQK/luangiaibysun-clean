@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import date
+import uuid
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -16,11 +17,12 @@ from tu_vi_calculator import calculate_chart
 from chart_sanitizer import normalize_engine_chart
 from tuvi_engine.data_loader import load_cach_cuc
 from tuvi_engine.rules.analysis import analyze_chart
+from google_sheets_storage import save_user_profile
 
 try:
     from google import genai
     from google.genai import types
-except Exception:  # optional until AI endpoint is called
+except Exception:
     genai = None
     types = None
 
@@ -30,7 +32,7 @@ ROOT_PROMPT_FILE = ROOT / "system_prompt_tuvi.txt"
 PROMPT_DIR = ROOT / "system_prompts"
 WEB_INDEX = ROOT / "index.html"
 
-app = FastAPI(title="TV AI - Tử Vi Đẩu Số", version="2.0")
+app = FastAPI(title="TV AI - Tử Vi Đẩu Số", version="2.1")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -98,6 +100,23 @@ def _prepare_chart(req: BirthRequest) -> dict[str, Any]:
     return normalize_engine_chart(analyzed)
 
 
+def _save_profile(req: BirthRequest) -> dict[str, Any]:
+    try:
+        created_at = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+        return save_user_profile(
+            user_id=str(uuid.uuid4()),
+            name=req.ten.strip(),
+            ngay_sinh=f"{req.ngay:02d}/{req.thang:02d}/{req.nam:04d}",
+            gio_sinh=str(req.gio_sinh),
+            gioi_tinh=req.gioi_tinh,
+            lich="Dương lịch" if req.duong_lich else "Âm lịch",
+            time_zone=req.time_zone,
+            created_at=created_at,
+        )
+    except Exception as exc:
+        return {"saved": False, "error": f"{type(exc).__name__}: {exc}"}
+
+
 @app.get("/", response_class=FileResponse)
 def root() -> FileResponse:
     if not WEB_INDEX.exists():
@@ -107,7 +126,7 @@ def root() -> FileResponse:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"status": "ok", "service": "tv-ai", "version": "2.0"}
+    return {"status": "ok", "service": "tv-ai", "version": "2.1"}
 
 
 @app.get("/api/cach-cuc")
@@ -118,7 +137,10 @@ def cach_cuc() -> dict[str, Any]:
 @app.post("/api/lap-so")
 def lap_so(req: BirthRequest) -> dict[str, Any]:
     try:
-        return _prepare_chart(req)
+        chart = _prepare_chart(req)
+        save_status = _save_profile(req)
+        chart["user_save_status"] = save_status
+        return chart
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Không thể lập lá số: {type(exc).__name__}: {exc}") from exc
 
