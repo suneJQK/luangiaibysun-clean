@@ -1,0 +1,8 @@
+Tên chế độ: Luận giải cực kỳ chi tiết
+Mục tiêu: Phân tích sâu từng tầng dữ liệu liên quan, không bỏ qua sao thực sự xuất hiện.
+Yêu cầu:
+- Luận riêng từng chính tinh và phụ tinh có liên quan.
+- Phân tích trạng thái Miếu/Vượng/Đắc/Bình/Hãm khi engine cung cấp.
+- Làm rõ tác động của Tuần/Triệt.
+- Đối chiếu các quan hệ cung và các tầng Đại vận, Tiểu vận, Lưu niên, Lưu nguyệt, Lưu nhật khi có dữ liệu.
+- Tổng hợp cuối cùng phải cho thấy yếu tố nào mạnh, yếu tố nào phá, yếu tố nào hỗ trợ.
