@@ -40,7 +40,14 @@ def dedupe_stars(stars: Iterable[Any]) -> list[dict[str, Any]]:
     return result
 
 
-def serialize_palace(cung: Any) -> dict[str, Any]:
+def serialize_palace(cung: Any, cung_so: int | None = None) -> dict[str, Any]:
+    """Serialize a palace and preserve its canonical 1..12 position.
+
+    ``cung_so`` is supplied by ``chart_builder`` from the authoritative
+    ``thapNhiCung[index]`` position.  Keeping it in the JSON is required by
+    the relationship-aware Cách Cục evaluator for Tam Hợp, Xung Chiếu,
+    Giáp Cung and Tam Phương Tứ Chính.
+    """
     stars = dedupe_stars(getattr(cung, "cungSao", []))
     main = [s for s in stars if s.get("id") in MAIN_STAR_IDS or s.get("loai") == 1]
     trang_sinh = [
@@ -55,7 +62,7 @@ def serialize_palace(cung: Any) -> dict[str, Any]:
         and s.get("id") not in trang_ids
         and s.get("loai") != 1
     ]
-    return {
+    result = {
         "cung": getattr(cung, "cungChu", ""),
         "can_chi": getattr(cung, "cungTen", "").strip(),
         "dia_chi": getattr(cung, "cungDiaChi", ""),
@@ -71,3 +78,6 @@ def serialize_palace(cung: Any) -> dict[str, Any]:
         "vong_trang_sinh": next((s["ten"] for s in trang_sinh), None),
         "sao": stars,
     }
+    if cung_so is not None:
+        result["cung_so"] = int(cung_so)
+    return result
