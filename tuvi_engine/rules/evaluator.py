@@ -24,6 +24,17 @@ RELATION_KEYS = (
     "giap_cung",
 )
 
+# TuViMCP-compatible aliases. They all operate on the same four-palace
+# Tam Phương Tứ Chính scope; the rule name can still document its intent.
+TAM_PHUONG_ALIASES = {
+    "tam_phuong_tu_chinh_aux",
+    "tam_phuong_tu_chinh_loc",
+    "tam_phuong_sat",
+    "tam_phuong_loc",
+    "tam_phuong_ma",
+    "tam_phuong_tuong",
+}
+
 
 def _palaces(chart: dict[str, Any]) -> list[dict[str, Any]]:
     raw = chart.get("12_cung") or chart.get("dia_ban") or {}
@@ -76,12 +87,19 @@ def _cung_name(palace: dict[str, Any]) -> str:
     return str(palace.get("cung") or palace.get("cung_ten") or "").strip()
 
 
-def _cung_chi(palace: dict[str, Any]) -> str:
-    value = palace.get("dia_chi") or palace.get("chi")
+def get_cung_chi(cung: dict[str, Any] | None) -> str:
+    """Extract địa chi from dia_chi/chi or from the final token of cung_ten."""
+    if not isinstance(cung, dict):
+        return ""
+    value = cung.get("dia_chi") or cung.get("chi")
     if value:
         return str(value).strip()
-    parts = _cung_name(palace).split()
+    parts = _cung_name(cung).split()
     return parts[-1] if parts else ""
+
+
+def _cung_chi(palace: dict[str, Any]) -> str:
+    return get_cung_chi(palace)
 
 
 def get_cung_by_chu(chart: dict[str, Any], name: str) -> dict[str, Any] | None:
@@ -198,20 +216,27 @@ def _scope_matches(scope: list[dict[str, Any]], condition: dict[str, Any]) -> bo
     return True
 
 
-def _match_house_condition(palace: dict[str, Any] | None, condition: dict[str, Any]) -> bool:
+def match_house_condition(palace: dict[str, Any] | None, condition: dict[str, Any]) -> bool:
+    """Compatibility helper matching TuViMCP-style single-palace predicates."""
     if palace is None:
         return False
     if "branches_in" in condition and _cung_chi(palace) not in set(condition["branches_in"]):
         return False
-    if "stars_all" in condition and not all(has_star(palace, s) for s in condition["stars_all"]):
+    if "stars_all" in condition and not all(has_star(palace, star) for star in condition["stars_all"]):
         return False
-    if "stars_any" in condition and not any(has_star(palace, s) for s in condition["stars_any"]):
+    if "stars_any" in condition and not any(has_star(palace, star) for star in condition["stars_any"]):
         return False
-    if "stars_none" in condition and any(has_star(palace, s) for s in condition["stars_none"]):
+    if "stars_none" in condition and any(has_star(palace, star) for star in condition["stars_none"]):
         return False
-    if "not_both" in condition and all(has_star(palace, s) for s in condition["not_both"]):
+    if "not_both" in condition and all(has_star(palace, star) for star in condition["not_both"]):
         return False
     return True
+
+
+def _evaluate_tam_phuong_alias(chart: dict[str, Any], target: dict[str, Any], condition: dict[str, Any]) -> bool:
+    """Evaluate TuViMCP-compatible tam_phuong_* aliases on the canonical scope."""
+    scope = related_palaces(chart, target)["tam_phuong_tu_chinh"]
+    return bool(scope) and _scope_matches(scope, condition)
 
 
 def evaluate_condition(chart: dict[str, Any], condition: dict[str, Any]) -> bool:
@@ -246,6 +271,13 @@ def evaluate_condition(chart: dict[str, Any], condition: dict[str, Any]) -> bool
         if not isinstance(rule, dict) or not _scope_matches(scope, rule):
             return False
 
+    for alias in TAM_PHUONG_ALIASES:
+        if alias in condition:
+            relation_present = True
+            rule = condition[alias]
+            if not isinstance(rule, dict) or not _evaluate_tam_phuong_alias(chart, target, rule):
+                return False
+
     if "giap_cung_pairs" in condition:
         relation_present = True
         pair_houses = relations["giap_cung"]
@@ -255,8 +287,10 @@ def evaluate_condition(chart: dict[str, Any], condition: dict[str, Any]) -> bool
         for pair in condition["giap_cung_pairs"] if isinstance(condition["giap_cung_pairs"], list) else []:
             if not isinstance(pair, (list, tuple)) or len(pair) != 2:
                 continue
-            a, b = pair
-            if (has_star(pair_houses[0], a) and has_star(pair_houses[1], b)) or (has_star(pair_houses[0], b) and has_star(pair_houses[1], a)):
+            first, second = pair
+            if (has_star(pair_houses[0], first) and has_star(pair_houses[1], second)) or (
+                has_star(pair_houses[0], second) and has_star(pair_houses[1], first)
+            ):
                 matched = True
                 break
         if not matched:
@@ -265,23 +299,27 @@ def evaluate_condition(chart: dict[str, Any], condition: dict[str, Any]) -> bool
     for key, house_name in (("cung_quan", "Quan Lộc"), ("cung_tai", "Tài Bạch"), ("cung_dien", "Điền Trạch")):
         if key in condition:
             relation_present = True
-            if not _match_house_condition(get_cung_by_chu(chart, house_name), condition[key]):
+            if not match_house_condition(get_cung_by_chu(chart, house_name), condition[key]):
                 return False
 
     for key, chi in (("cung_ty", "Tỵ"), ("cung_dau", "Dậu")):
         if key in condition:
             relation_present = True
-            if not _match_house_condition(get_cung_by_chi(chart, chi), condition[key]):
+            if not match_house_condition(get_cung_by_chi(chart, chi), condition[key]):
                 return False
 
     if "luc_hop" in condition:
         relation_present = True
         partner = relations["nhi_hop"]
-        if not partner or not _match_house_condition(partner[0], condition["luc_hop"]):
+        if not partner or not match_house_condition(partner[0], condition["luc_hop"]):
             return False
 
-    target_filters = {k: condition[k] for k in ("branches_in", "stars_all", "stars_any", "stars_none", "not_both") if k in condition}
-    if target_filters and not _match_house_condition(target, target_filters):
+    target_filters = {
+        key: condition[key]
+        for key in ("branches_in", "stars_all", "stars_any", "stars_none", "not_both")
+        if key in condition
+    }
+    if target_filters and not match_house_condition(target, target_filters):
         return False
 
     if "stem_contains" in condition:
