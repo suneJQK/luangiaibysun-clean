@@ -27,3 +27,5 @@ assert len(p['stars']) == p['count']
 PY
       - name: Run tests
         run: pytest -q
+      - name: Workflow trigger check
+        run: echo "V2 CI triggered successfully for $GITHUB_SHA"
