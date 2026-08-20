@@ -11,13 +11,14 @@ from google.genai import types
 from tuvi_lap_so_engine import lap_la_so
 from tu_vi_calculator import calculate_chart
 from chart_sanitizer import normalize_engine_chart
+from tuvi_engine.rules.analysis import analyze_chart
 
 st.set_page_config(page_title="Tử Vi Đẩu Số", page_icon="☯️", layout="wide", initial_sidebar_state="collapsed")
 BASE_DIR=Path(__file__).resolve().parent
 BOOKS_FILE=BASE_DIR/"books_cache.json"; PROMPT_DIR=BASE_DIR/"system_prompts"; ROOT_PROMPT_FILE=BASE_DIR/"system_prompt_tuvi.txt"
 st.markdown("""
 <style>
-#MainMenu,footer{visibility:hidden}.block-container{max-width:1200px;padding:1rem 1.2rem 2rem}h1{font-size:1.65rem!important;margin:.1rem 0 .2rem!important}h2{font-size:1.15rem!important;margin:.7rem 0 .45rem!important}h3{font-size:1rem!important}[data-testid="stCaptionContainer"]{font-size:.78rem}[data-testid="stMetric"]{padding:.45rem .6rem;border:1px solid rgba(128,128,128,.22);border-radius:10px}[data-testid="stDataFrame"]{border-radius:10px;overflow:hidden}div.stButton>button,div.stFormSubmitButton>button{border-radius:9px;min-height:2.2rem}.compact-note{font-size:.76rem;opacity:.72;margin:.1rem 0 .45rem}@media(max-width:700px){.block-container{padding:.7rem .55rem 1.5rem}h1{font-size:1.35rem!important}}
+#MainMenu,footer{visibility:hidden}.block-container{max-width:1200px;padding:1rem 1.2rem 2rem}h1{font-size:1.65rem!important;margin:.1rem 0 .2rem!important}h2{font-size:1.15rem!important;margin:.7rem 0 .45rem!important}h3{font-size:1rem!important;margin:.4rem 0 .25rem!important}[data-testid="stCaptionContainer"]{font-size:.78rem}[data-testid="stMetric"]{padding:.45rem .6rem;border:1px solid rgba(128,128,128,.22);border-radius:10px}[data-testid="stDataFrame"]{border-radius:10px;overflow:hidden}div.stButton>button,div.stFormSubmitButton>button{border-radius:9px;min-height:2.2rem}.compact-note{font-size:.76rem;opacity:.72;margin:.1rem 0 .45rem}@media(max-width:700px){.block-container{padding:.7rem .55rem 1.5rem}h1{font-size:1.35rem!important}}
 </style>""",unsafe_allow_html=True)
 
 def secret(n):
@@ -53,12 +54,15 @@ def compact(v,limit=90000):
     s=v if isinstance(v,str) else json.dumps(v,ensure_ascii=False,separators=(",",":"))
     return s if len(s)<=limit else s[:limit]+"..."
 def ask_ai(q,chart,calc,year):
-    ai_chart=normalize_engine_chart(chart,for_ai=True)
-    prompt=f'''Năm luận: {year}\n\nCÂU HỎI:\n{q}\n\nDỮ LIỆU LÁ SỐ ĐÃ CHUẨN HÓA TỪ ENGINE PYTHON LOCAL:\n{compact(ai_chart)}\n\nQUAN HỆ TÍNH BẰNG PYTHON:\n{compact(calc,30000)}\n\nTÀI LIỆU:\n{compact(books,40000)}\n\nChỉ diễn giải dữ liệu được cung cấp. Không đọc ảnh/OCR, không tự an sao, không tự thêm hoặc sửa sao/Can-Chi. Dùng đầy đủ chính tinh, phụ tinh, Tứ Hóa, Tràng Sinh, Tuần/Triệt, Đại vận, Tiểu vận và hạn nếu có. Trạng thái M/V/Đ/B/H phải được giữ nguyên theo dữ liệu engine. Không hiển thị tên trường raw của engine như "sao", không mô tả boolean true/false, không trích nguyên JSON engine. Nếu thiếu dữ liệu thì nói rõ.'''
-    cfg=types.GenerateContentConfig(system_instruction=system_prompt+"\nAI chỉ diễn giải dữ liệu từ engine Python local và tuyệt đối không thay đổi dữ liệu đầu vào.",temperature=.2,max_output_tokens=30000)
+    analyzed_chart=analyze_chart(chart)
+    ai_chart=normalize_engine_chart(analyzed_chart,for_ai=True)
+    ai_context=analyzed_chart.get("ai_context",{})
+    cach_cuc_analysis=analyzed_chart.get("cach_cuc_analysis",{})
+    prompt=f'''Năm luận: {year}\n\nCÂU HỎI:\n{q}\n\nDỮ LIỆU LÁ SỐ ĐÃ CHUẨN HÓA TỪ ENGINE PYTHON LOCAL:\n{compact(ai_chart)}\n\nBẰNG CHỨNG CÁCH CỤC ĐÃ MATCH:\n{compact(cach_cuc_analysis,30000)}\n\nQUAN HỆ CUNG DÙNG CHO LUẬN GIẢI:\n{compact(ai_context.get("relationship_knowledge",{}),20000)}\n\nCONTEXT LUẬN GIẢI AI:\n{compact(ai_context,50000)}\n\nQUAN HỆ TÍNH BẰNG PYTHON:\n{compact(calc,30000)}\n\nTÀI LIỆU:\n{compact(books,40000)}\n\nQUY TẮC BẮT BUỘC:\n- Cách Cục đã match là một phần bắt buộc của luận giải, phải nêu rõ Cách Cục nào được xét và dùng điều kiện/bằng chứng tương ứng.\n- Chỉ sử dụng Cách Cục có trong BẰNG CHỨNG CÁCH CỤC ĐÃ MATCH; không tự tạo Cách Cục mới.\n- Đối chiếu Cách Cục với sao đồng cung, Tam Hợp, Xung Chiếu, Nhị Hợp, Giáp Cung và Tuần/Triệt trước khi kết luận mức độ ảnh hưởng.\n- Phân biệt rõ dữ kiện của engine với phần diễn giải suy luận.\n- Không đọc ảnh/OCR, không tự an sao, không tự thêm hoặc sửa sao/Can-Chi.\n- Dùng đầy đủ chính tinh, phụ tinh, Tứ Hóa, Tràng Sinh, Tuần/Triệt, Đại vận, Tiểu vận và hạn nếu có.\n- Trạng thái M/V/Đ/B/H phải được giữ nguyên theo dữ liệu engine.\n- Nếu không có Cách Cục nào match, nói rõ là không có Cách Cục được xác định từ bộ điều kiện hiện tại.\n- Nếu thiếu dữ liệu thì nói rõ.'''
+    cfg=types.GenerateContentConfig(system_instruction=system_prompt+"\nAI chỉ diễn giải dữ liệu từ engine Python local và tuyệt đối không thay đổi dữ liệu đầu vào. Cách Cục đã match là bằng chứng bắt buộc cần xét trong phần luận giải.",temperature=.2,max_output_tokens=30000)
     return get_client(API_KEY).models.generate_content(model="gemini-3.6-flash",contents=prompt,config=cfg).text
 st.session_state.setdefault("chart_json",None);st.session_state.setdefault("chat_history",[])
-st.title("☯️ Tử Vi Đẩu Số");st.markdown('<div class="compact-note">Engine Python local → lá số chuẩn hóa → AI luận giải</div>',unsafe_allow_html=True)
+st.title("☯️ Tử Vi Đẩu Số");st.markdown('<div class="compact-note">Engine Python local → lá số chuẩn hóa → Cách Cục + quan hệ cung → AI luận giải</div>',unsafe_allow_html=True)
 with st.container(border=True):
     st.markdown("**① Thông tin sinh**")
     with st.form("lap_la_so_form"):
@@ -75,12 +79,13 @@ if lap:
     try:
         branch=gl.split(" ",1)[0];chart=lap_la_so(ns.day,ns.month,ns.year,branch,gt,ten,lich=="Dương lịch",int(tz))
         if len(chart.get("12_cung",{}))!=12:raise ValueError("Engine không tạo đủ 12 cung")
-        chart.setdefault("input",{})["gio_hien_thi"]=gl;chart["input"]["lich"]=lich;st.session_state.chart_json=normalize_engine_chart(chart);st.session_state.chat_history=[];st.success("Đã lập lá số.")
+        chart=analyze_chart(chart)
+        chart.setdefault("input",{})["gio_hien_thi"]=gl;chart["input"]["lich"]=lich;st.session_state.chart_json=normalize_engine_chart(chart);st.session_state.chat_history=[];st.success("Đã lập lá số và chuẩn bị Cách Cục/quan hệ cung cho AI.")
     except Exception as e:st.error(f"Không thể lập lá số: {type(e).__name__}: {e}")
 if st.session_state.chart_json:
     chart=normalize_engine_chart(st.session_state.chart_json);st.session_state.chart_json=chart
     st.markdown("**② Lá số**")
-    tabs=st.tabs(["Thiên bàn","12 cung","Hạn","Dữ liệu AI"])
+    tabs=st.tabs(["Thiên bàn","12 cung","Hạn","Cách Cục","Dữ liệu AI"])
     with tabs[0]:
         with st.expander("Xem chi tiết thiên bàn",expanded=False):st.json(chart.get("thien_ban",{}))
     with tabs[1]:
@@ -102,7 +107,20 @@ if st.session_state.chart_json:
     with tabs[2]:
         with st.expander("Đại vận / Tiểu vận",expanded=False):st.json({n:{"dai_van":d.get("dai_van",{}),"tieu_van":d.get("tieu_van",{})} for n,d in chart.get("12_cung",{}).items()})
     with tabs[3]:
-        with st.expander("JSON chuẩn gửi AI",expanded=False):st.json(normalize_engine_chart(chart,for_ai=True))
+        st.markdown("### Cách Cục được áp dụng")
+        cach=chart.get("cach_cuc_analysis",{})
+        if not cach.get("matched"):
+            st.info("Chưa có Cách Cục nào được engine xác định từ điều kiện hiện tại.")
+        else:
+            st.write(f"Đã match **{cach.get('matched_count',0)} Cách Cục**. Đây là bằng chứng bắt buộc khi AI luận giải.")
+            for item in cach.get("matched",[]):
+                with st.expander(f"{item.get('name','Cách Cục')} · {item.get('category','')}",expanded=False):
+                    st.write(item.get("description", ""));
+                    if item.get("reason"):st.caption(f"Lý do: {item['reason']}")
+                    if item.get("conditions"):st.json(item["conditions"])
+                    if item.get("binh_chu"):st.markdown(item["binh_chu"])
+    with tabs[4]:
+        with st.expander("JSON chuẩn gửi AI",expanded=False):st.json(chart.get("ai_context",normalize_engine_chart(chart,for_ai=True)))
     st.download_button("⬇️ Tải JSON",json.dumps(chart,ensure_ascii=False,indent=2),"la_so_tu_vi.json","application/json",use_container_width=True)
     st.markdown("**③ Chat AI**");st.markdown('<div class="compact-note">Lịch sử cuộn riêng; ô nhập luôn nằm dưới cùng của khung chat.</div>',unsafe_allow_html=True)
     with st.container(border=True):
