@@ -24,7 +24,7 @@ def _lap_la_so_uncached(
     tb = lapThienBan(day, month, year, hour, gender, name, db, is_solar, timezone)
     cungs: dict[str, Any] = {}
     for index in range(1, 13):
-        palace = serialize_palace(db.thapNhiCung[index])
+        palace = serialize_palace(db.thapNhiCung[index], cung_so=index)
         key = palace["cung"] or palace["dia_chi"] or str(index)
         cungs[key] = palace
 
