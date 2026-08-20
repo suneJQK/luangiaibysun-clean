@@ -5,6 +5,7 @@ import uuid
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,6 +26,7 @@ PROMPT_DIR = ROOT / "system_prompts"
 AI_MODE_DIR = ROOT / "ai_modes"
 WEB_INDEX = ROOT / "index.html"
 AI_MODE_INDEX = ROOT / "ai_mode.html"
+VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
 app = FastAPI(title="TV AI - Tử Vi Đẩu Số", version="2.5")
 app.add_middleware(
@@ -113,7 +115,7 @@ def _prepare_chart(req: BirthRequest) -> dict[str, Any]:
 def _save_profile(req: BirthRequest) -> dict[str, Any]:
     try:
         from google_sheets_storage import save_user_profile
-        created_at = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+        created_at = datetime.now(timezone.utc).astimezone(VN_TZ).isoformat(timespec="seconds")
         return save_user_profile(
             user_id=str(uuid.uuid4()),
             name=req.ten.strip(),
@@ -174,7 +176,7 @@ def google_sheets_test() -> dict[str, Any]:
             gioi_tinh="Nam",
             lich="Dương lịch",
             time_zone=7,
-            created_at=datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
+            created_at=datetime.now(timezone.utc).astimezone(VN_TZ).isoformat(timespec="seconds"),
         )
         return {"ok": True, "result": result}
     except Exception as exc:
