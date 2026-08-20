@@ -7,7 +7,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -29,9 +29,10 @@ ROOT = Path(__file__).resolve().parent.parent
 BOOKS_FILE = ROOT / "books_cache.json"
 ROOT_PROMPT_FILE = ROOT / "system_prompt_tuvi.txt"
 PROMPT_DIR = ROOT / "system_prompts"
+AI_MODE_DIR = ROOT / "ai_modes"
 WEB_INDEX = ROOT / "index.html"
 
-app = FastAPI(title="TV AI - Tử Vi Đẩu Số", version="2.2")
+app = FastAPI(title="TV AI - Tử Vi Đẩu Số", version="2.3")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -74,6 +75,30 @@ def _system_prompt() -> str:
             if text:
                 parts.append(text)
     return "\n\n".join(x for x in parts if x) or "Bạn là chuyên gia Tử Vi Đẩu Số."
+
+
+def _available_ai_modes() -> list[dict[str, str]]:
+    modes: list[dict[str, str]] = []
+    if not AI_MODE_DIR.exists():
+        return modes
+    for path in sorted(AI_MODE_DIR.glob("*.txt")):
+        text = path.read_text(encoding="utf-8").strip()
+        first_line = next((x.strip() for x in text.splitlines() if x.strip()), "")
+        name = first_line.split(":", 1)[1].strip() if ":" in first_line else path.stem
+        modes.append({"id": path.stem, "name": name, "file": path.name})
+    return modes
+
+
+def _load_ai_mode(mode_id: str | None) -> tuple[str, str]:
+    modes = _available_ai_modes()
+    if not modes:
+        return "", "standard"
+    wanted = (mode_id or "standard").strip().lower()
+    path = AI_MODE_DIR / f"{wanted}.txt"
+    if not path.exists():
+        path = AI_MODE_DIR / f"{modes[0]['id']}.txt"
+        wanted = modes[0]["id"]
+    return path.read_text(encoding="utf-8").strip(), wanted
 
 
 def _compact(value: Any, limit: int = 90000) -> str:
@@ -127,7 +152,12 @@ def root() -> FileResponse:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"status": "ok", "service": "tv-ai", "version": "2.2"}
+    return {"status": "ok", "service": "tv-ai", "version": "2.3"}
+
+
+@app.get("/api/ai-modes")
+def ai_modes() -> dict[str, Any]:
+    return {"modes": _available_ai_modes()}
 
 
 @app.get("/api/google-sheets-test")
@@ -166,18 +196,19 @@ def lap_so(req: BirthRequest) -> dict[str, Any]:
 
 
 @app.post("/api/luan-giai")
-def luan_giai(req: AskRequest) -> dict[str, Any]:
+def luan_giai(req: AskRequest, request: Request) -> dict[str, Any]:
     try:
         chart = _prepare_chart(req)
         calc = calculate_chart(chart)
         ai_context = chart.get("ai_context", {})
         cach_cuc_analysis = chart.get("cach_cuc_analysis", {})
         books = _load_json(BOOKS_FILE, {})
-        prompt = f'''Năm luận: {req.year or date.today().year}\n\nCÂU HỎI:\n{req.question}\n\nDỮ LIỆU LÁ SỐ:\n{_compact(chart)}\n\nBẰNG CHỨNG CÁCH CỤC:\n{_compact(cach_cuc_analysis, 30000)}\n\nQUAN HỆ CUNG:\n{_compact(ai_context.get("relationship_knowledge", {}), 20000)}\n\nCONTEXT AI:\n{_compact(ai_context, 50000)}\n\nTÍNH TOÁN KHÁC:\n{_compact(calc, 30000)}\n\nTÀI LIỆU:\n{_compact(books, 40000)}\n\nQUY TẮC BẮT BUỘC:\n- Chỉ dùng Cách Cục đã match từ engine.\n- Cách Cục lõi và modifier phá/giảm phải được luận riêng rồi tổng hợp.\n- Đối chiếu Đồng cung, Tam Hợp, Xung Chiếu, Nhị Hợp, Giáp Cung và Tuần/Triệt.\n- Không tự an sao, không tự thêm hoặc sửa dữ liệu engine.\n- Nếu không có Cách Cục match, nói rõ là chưa xác định được từ bộ điều kiện hiện tại.'''
+        mode_text, mode_id = _load_ai_mode(request.cookies.get("tv_ai_mode", "standard"))
+        prompt = f'''Năm luận: {req.year or date.today().year}\n\nCHẾ ĐỘ LUẬN GIẢI ĐƯỢC CHỌN:\n{mode_text}\n\nCÂU HỎI:\n{req.question}\n\nDỮ LIỆU LÁ SỐ:\n{_compact(chart)}\n\nBẰNG CHỨNG CÁCH CỤC:\n{_compact(cach_cuc_analysis, 30000)}\n\nQUAN HỆ CUNG:\n{_compact(ai_context.get("relationship_knowledge", {}), 20000)}\n\nCONTEXT AI:\n{_compact(ai_context, 50000)}\n\nTÍNH TOÁN KHÁC:\n{_compact(calc, 30000)}\n\nTÀI LIỆU:\n{_compact(books, 40000)}\n\nQUY TẮC BẮT BUỘC:\n- Chỉ dùng Cách Cục đã match từ engine.\n- Cách Cục lõi và modifier phá/giảm phải được luận riêng rồi tổng hợp.\n- Đối chiếu Đồng cung, Tam Hợp, Xung Chiếu, Nhị Hợp, Giáp Cung và Tuần/Triệt.\n- Không tự an sao, không tự thêm hoặc sửa dữ liệu engine.\n- Nếu không có Cách Cục match, nói rõ là chưa xác định được từ bộ điều kiện hiện tại.'''
 
         api_key = os.environ.get("GEMINI_API_KEY", "")
         if not api_key:
-            return {"chart": chart, "calculation": calc, "answer": None, "ai_status": "missing_GEMINI_API_KEY"}
+            return {"chart": chart, "calculation": calc, "answer": None, "ai_status": "missing_GEMINI_API_KEY", "ai_mode": mode_id}
         if genai is None or types is None:
             raise RuntimeError("google-genai chưa được cài đặt")
 
@@ -192,6 +223,6 @@ def luan_giai(req: AskRequest) -> dict[str, Any]:
             contents=prompt,
             config=config,
         )
-        return {"chart": chart, "calculation": calc, "answer": response.text, "ai_status": "ok"}
+        return {"chart": chart, "calculation": calc, "answer": response.text, "ai_status": "ok", "ai_mode": mode_id}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Không thể luận giải: {type(exc).__name__}: {exc}") from exc
