@@ -1,0 +1,36 @@
+name: Repair Cách Cục data
+
+on:
+  push:
+    branches: [fix/cach-cuc-rules-20260820]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: ${{ contains(github.event.head_commit.message, 'add deterministic repair map') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Apply deterministic Cách Cục repairs
+        run: python scripts/repair_cach_cuc_conditions.py
+      - name: Validate JSON and rule count
+        run: |
+          python - <<'PY'
+          import json
+          p=json.load(open('data/cach_cuc.json', encoding='utf-8'))
+          assert len(p) == 51
+          assert [x['id'] for x in p] == list(range(1, 52))
+          PY
+      - name: Commit repaired data and remove one-shot tooling
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add data/cach_cuc.json
+          git rm -f scripts/repair_cach_cuc_conditions.py .github/workflows/repair-cach-cuc.yml
+          git commit -m "fix(cach-cuc): repair inconsistent condition rules"
+          git push
