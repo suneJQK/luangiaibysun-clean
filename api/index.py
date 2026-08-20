@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import uuid
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -51,7 +50,7 @@ class BirthRequest(BaseModel):
 class AskRequest(BirthRequest):
     question: str = Field(min_length=1, max_length=8000)
     year: int | None = None
-    provider: str = "gemini"
+    provider: str | None = None
 
 
 def _load_json(path: Path, default: Any) -> Any:
@@ -103,16 +102,7 @@ def _compact(value: Any, limit: int = 90000) -> str:
 
 
 def _prepare_chart(req: BirthRequest) -> dict[str, Any]:
-    chart = lap_la_so(
-        req.ngay,
-        req.thang,
-        req.nam,
-        req.gio_sinh,
-        req.gioi_tinh,
-        req.ten,
-        req.duong_lich,
-        req.time_zone,
-    )
+    chart = lap_la_so(req.ngay, req.thang, req.nam, req.gio_sinh, req.gioi_tinh, req.ten, req.duong_lich, req.time_zone)
     if len(chart.get("12_cung", {})) != 12:
         raise ValueError("Engine không tạo đủ 12 cung")
     analyzed = analyze_chart(chart)
@@ -123,7 +113,6 @@ def _prepare_chart(req: BirthRequest) -> dict[str, Any]:
 def _save_profile(req: BirthRequest) -> dict[str, Any]:
     try:
         from google_sheets_storage import save_user_profile
-
         created_at = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
         return save_user_profile(
             user_id=str(uuid.uuid4()),
@@ -219,7 +208,6 @@ def luan_giai(req: AskRequest, request: Request) -> dict[str, Any]:
         mode_text, mode_id = _load_ai_mode(request.cookies.get("tv_ai_mode", "standard"))
         provider_id = normalize_provider(req.provider or request.cookies.get("tv_ai_provider", "gemini"))
         prompt = f'''Năm luận: {req.year or date.today().year}\n\nCHẾ ĐỘ LUẬN GIẢI ĐƯỢC CHỌN:\n{mode_text}\n\nCÂU HỎI:\n{req.question}\n\nDỮ LIỆU LÁ SỐ:\n{_compact(chart)}\n\nBẰNG CHỨNG CÁCH CỤC:\n{_compact(cach_cuc_analysis, 30000)}\n\nQUAN HỆ CUNG:\n{_compact(ai_context.get("relationship_knowledge", {}), 20000)}\n\nCONTEXT AI:\n{_compact(ai_context, 50000)}\n\nTÍNH TOÁN KHÁC:\n{_compact(calc, 30000)}\n\nTÀI LIỆU:\n{_compact(books, 40000)}\n\nQUY TẮC BẮT BUỘC:\n- Chỉ dùng Cách Cục đã match từ engine.\n- Cách Cục lõi và modifier phá/giảm phải được luận riêng rồi tổng hợp.\n- Đối chiếu Đồng cung, Tam Hợp, Xung Chiếu, Nhị Hợp, Giáp Cung và Tuần/Triệt.\n- Không tự an sao, không tự thêm hoặc sửa dữ liệu engine.\n- Nếu không có Cách Cục match, nói rõ là chưa xác định được từ bộ điều kiện hiện tại.'''
-
         answer, selected_provider = generate_ai(
             provider=provider_id,
             system_instruction=_system_prompt() + "\nAI chỉ diễn giải dữ liệu từ engine Python local.",
