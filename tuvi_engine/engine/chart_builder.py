@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from .date_handler import normalize_birth_input
+from .schema import require_valid_v2_chart, to_v2_chart
 from .serializer import serialize_palace
 
 
@@ -16,8 +17,6 @@ def _lap_la_so_uncached(
     is_solar: bool = True,
     timezone: float = 7.0,
 ) -> dict[str, Any]:
-    # Imported lazily to avoid an import cycle: the compatibility module itself
-    # imports this V2 facade.
     from tuvi_engine._engine import diaBan, lapDiaBan, lapThienBan
 
     db = lapDiaBan(diaBan, day, month, year, hour, gender, is_solar, timezone)
@@ -28,7 +27,7 @@ def _lap_la_so_uncached(
         key = palace["cung"] or palace["dia_chi"] or str(index)
         cungs[key] = palace
 
-    return {
+    legacy_shape = {
         "schema_version": "engine_2.1",
         "source": "local_tuvi_engine",
         "input": {
@@ -47,7 +46,9 @@ def _lap_la_so_uncached(
             "can_nam": getattr(tb, "canNamTen", None),
             "chi_nam": getattr(tb, "chiNamTen", None),
             "can_thang": getattr(tb, "canThangTen", None),
+            "chi_thang": getattr(tb, "chiThangTen", None),
             "can_ngay": getattr(tb, "canNgayTen", None),
+            "chi_ngay": getattr(tb, "chiNgayTen", None),
             "menh": getattr(tb, "menh", None),
             "ban_menh": getattr(tb, "banMenh", None),
             "ten_cuc": getattr(tb, "tenCuc", None),
@@ -58,6 +59,7 @@ def _lap_la_so_uncached(
         },
         "12_cung": cungs,
     }
+    return to_v2_chart(legacy_shape)
 
 
 def lap_la_so(
@@ -71,17 +73,11 @@ def lap_la_so(
     time_zone: float = 7.0,
 ) -> dict[str, Any]:
     normalized = normalize_birth_input(
-        ngay,
-        thang,
-        nam,
-        gio_sinh,
-        gioi_tinh,
-        ten,
-        duong_lich,
-        time_zone,
+        ngay, thang, nam, gio_sinh, gioi_tinh, ten, duong_lich, time_zone
     )
     from .cache import cached_lap_la_so
-    return cached_lap_la_so(
+
+    chart = cached_lap_la_so(
         normalized.day,
         normalized.month,
         normalized.year,
@@ -91,3 +87,4 @@ def lap_la_so(
         normalized.is_solar,
         normalized.timezone,
     )
+    return require_valid_v2_chart(chart)
