@@ -42,9 +42,7 @@
           "cung_menh": {
             "branches_in": [
               "Sửu",
-              "Mùi",
-              "Mão",
-              "Dậu"
+              "Mùi"
             ]
           },
           "tam_phuong_tu_chinh": {
@@ -193,6 +191,10 @@
         "stars_all": [
           "Tử Vi",
           "Thiên Phủ"
+        ],
+        "branches_in": [
+          "Dần",
+          "Thân"
         ]
       }
     }
@@ -249,11 +251,10 @@
     "binh_chu": "Sao Tử vi cùng Tả Phụ, Hữu Bật đóng tại cung mệnh. Ưu điểm: Có được nhiều sự trợ giúp, gặp nhiều quý nhân phò trợ, được quần chúng hưởng ứng, phú quý trọn đời. Nếu sao tử vi đóng tại cung Mệnh, Tả Phụ, Hữu bật nằm tại cung tam phương, tứ chính chiếu cung mệnh, hoặc nằm ở hai cung bên cạnh kèm lấy cung mệnh (giáp), là cách cục Phụ, Bật củng chủ (Phụ, Bật chầu vua), ưu điểm cũng tương tự như cách cục Quân thần khánh hội....",
     "uu_khuyet_diem": "Ưu điểm: Có được nhiều sự trợ giúp, gặp nhiều quý nhân phò trợ, được quần",
     "conditions": {
-      "tam_phuong_tu_chinh": {
-        "stars_required": [
+      "cung_menh": {
+        "stars_all": [
           "Tử Vi"
-        ],
-        "min_count": 1
+        ]
       },
       "tam_phuong_tu_chinh_aux": {
         "stars_required": [
@@ -265,7 +266,7 @@
           "Văn Khúc",
           "Lộc Tồn"
         ],
-        "min_count": 3
+        "min_count": 2
       }
     }
   },
@@ -286,7 +287,7 @@
           "Thiên Đồng",
           "Thiên Lương"
         ],
-        "min_count": 3
+        "min_count": 4
       }
     }
   },
@@ -362,6 +363,10 @@
         "stars_all": [
           "Cự Môn",
           "Thái Dương"
+        ],
+        "branches_in": [
+          "Dần",
+          "Thân"
         ]
       }
     }
@@ -416,6 +421,11 @@
     "binh_chu": "Cũng chính là cách cục Nhật chiếu lôi môn, sao Thái Dương và sao Thiên Lương trấn mệnh tại cung Mão, ngoài ra còn phải là người sinh năm Ất, cung mệnh đồng thời xuất hiện Lộc Tồn và Văn Xương mới hợp cách. Nếu lá số được cách cục này, sự nghiệp học hành cực kỳ xuất sắc, thi cử đỗ đạt cao, đảm nhiệm các vị trí, chức vụ trọng yếu của nhà nước, trở thành nhân vật nổi tiếng trong chính giới, cực hiển quý. Ưu điểm: Dự thi công chức hoặc các kỳ thi quốc gia sẽ có thành tích cao, tiền tài chức vị song toàn, hợp với nghề kinh doanh. Trong kinh văn có viết: \" Lương, Dương, Xương, Lộc tề tựu, thi cử đỗ...",
     "uu_khuyet_diem": "Ưu điểm: Dự thi công chức hoặc các kỳ thi quốc gia sẽ có thành tích cao, tiền",
     "conditions": {
+      "cung_menh": {
+        "branches_in": [
+          "Mão"
+        ]
+      },
       "tam_phuong_tu_chinh": {
         "stars_required": [
           "Thái Dương",
@@ -426,11 +436,11 @@
       },
       "tam_phuong_tu_chinh_loc": {
         "stars_required": [
-          "Lộc Tồn",
-          "Hóa Lộc"
+          "Lộc Tồn"
         ],
         "min_count": 1
-      }
+      },
+      "stem_contains": "Ất"
     }
   },
   {
@@ -512,18 +522,30 @@
     "binh_chu": "1. Sao Thiên Đồng, Thái Âm trấn mệnh tại cung Tý, có các sao Lộc Tồn, Hóa Lộc, Hóa Quyền, Hóa Khoa, Tả, Hữu, Xương , Khúc , Khôi, Việt gia hội là hợp cách. 2. Sao Thái Âm, Thiên Đồng đều trấn cung Điền Trạch tại cung Tý, gặp cát tinh, cát hóa hội hợp, nhưng cung mệnh và cung tam phương phải cần có cát 98 tinh. Sao Thiên Đồng, Thái Âm tại cung Tý gặp cát tinh chủ về tướng mạo thanh tú, lịch thiệp, học vấn cao, có được tiền tài và danh vọng. Nếu cách cục tốt chủ về đại phú, đại quý. Ưu điểm: Thông minh, thanh tú, cử chỉ thanh lịch, nhã nhặn, khiêm nhường, có được trợ giúp lớn từ người khác giới,...",
     "uu_khuyet_diem": "Ưu điểm: Thông minh, thanh tú, cử chỉ thanh lịch, nhã nhặn, khiêm nhường, có",
     "conditions": {
-      "cung_menh": {
-        "branches_in": [
-          "Tý"
-        ]
-      },
-      "tam_phuong_tu_chinh": {
-        "stars_required": [
-          "Thái Âm",
-          "Thiên Đồng"
-        ],
-        "min_count": 2
-      }
+      "any_of": [
+        {
+          "cung_menh": {
+            "branches_in": [
+              "Tý"
+            ],
+            "stars_all": [
+              "Thái Âm",
+              "Thiên Đồng"
+            ]
+          }
+        },
+        {
+          "cung_dien": {
+            "branches_in": [
+              "Tý"
+            ],
+            "stars_all": [
+              "Thái Âm",
+              "Thiên Đồng"
+            ]
+          }
+        }
+      ]
     }
   },
   {
@@ -577,15 +599,32 @@
     "binh_chu": "Sao Cự Môn trấn mệnh tại cng Tý, Ngọ, lại có Lộc Tồn, Khoa, Quyền, Lộc, Tả, Hữu, Xương, Khúc, Khôi, Việt gia hội là hợp cách. Nhưng chỉ có người sinh năm Tân, Quý mới được coi là hợp cách cục này. Lá số sở hữu cách cục này chủ về lý tưởng cao xa, tài hoa xuất chúng, trí tuệ hơn người, theo nghề kinh doanh sẽ trở thành bậc đại phú, theo nghiệp chính trị sẽ có được chức vị, vị trí cao, nhiều lộc, nắm giữ binh quyền nếu không cũng trở thành nhân vật có quyền uy trong giới khoa học, học thuật. Nhưng phải trải qua một quá trình phấn đấu vất vả, gian khổ mới có được thành tựu, nên cách cục này mới c...",
     "uu_khuyet_diem": "Ưu điểm: Có thị hiếu tốt, có hoài bão và nghị lực phấn đấu, ham thích nghiên | Khuyết điểm: Tuổi trẻ nhiều vất vả, gặp chuyện phiền phức, oan uổng.",
     "conditions": {
-      "cung_menh": {
-        "stars_all": [
-          "Cự Môn"
-        ],
-        "branches_in": [
-          "Tý",
-          "Ngọ"
-        ]
-      }
+      "any_of": [
+        {
+          "cung_menh": {
+            "stars_all": [
+              "Cự Môn"
+            ],
+            "branches_in": [
+              "Tý",
+              "Ngọ"
+            ]
+          },
+          "stem_contains": "Tân"
+        },
+        {
+          "cung_menh": {
+            "stars_all": [
+              "Cự Môn"
+            ],
+            "branches_in": [
+              "Tý",
+              "Ngọ"
+            ]
+          },
+          "stem_contains": "Quý"
+        }
+      ]
     }
   },
   {
@@ -608,6 +647,21 @@
           "Dần",
           "Thân"
         ]
+      },
+      "tam_phuong_tu_chinh_aux": {
+        "stars_required": [
+          "Lộc Tồn",
+          "Hóa Lộc",
+          "Hóa Quyền",
+          "Hóa Khoa",
+          "Tả Phù",
+          "Hữu Bật",
+          "Văn Xương",
+          "Văn Khúc",
+          "Thiên Khôi",
+          "Thiên Việt"
+        ],
+        "min_count": 1
       }
     }
   },
@@ -621,14 +675,58 @@
     "binh_chu": "1. Sao Thiên Đồng, Thái Âm trấn mệnh tại cung Ngọ, người sinh năm Bính, Mậu có Kình dương tại cung mệnh, được cát tinh hội chiếu, là cách cục Mã đầu đới tiễn. Nếu không sinh vào năm Bính, Mậu sẽ không hợp cách cục này. 2. Sao Tham Lang trấn mệnh tại cung Ngọ, người sinh năm Bính, Mậu có Kình dương tại cung mệnh, cũng là cách cục Mã đầu đới tiễn có các sao Hỏa, Linh, 105 Phụ, Bật nằm cùng cung hoặc gia hội lại càng cát lợi. Cung ngọ là ngựa (mã), Kình dương là tên (tiễn), nên mới có tên gọi là Mã đầu đới tiễn. Nếu sở hữu cách cục này, chủ về hiển phát nghiệp võ, thống lĩnh quân đội, trấn giữ nơ...",
     "uu_khuyet_diem": "Ưu điểm: Chủ hiển đạt về nghiệp võ, thống lĩnh quân đội, trấn giữ nơi trọng | Khuyết điểm: Bôn ba bên ngoài, tuổi trẻ vất vả lao lực mà không có thành tựu,",
     "conditions": {
-      "cung_menh": {
-        "stars_all": [
-          "Kình Dương"
-        ],
-        "branches_in": [
-          "Ngọ"
-        ]
-      }
+      "any_of": [
+        {
+          "cung_menh": {
+            "branches_in": [
+              "Ngọ"
+            ],
+            "stars_all": [
+              "Kình Dương",
+              "Thiên Đồng",
+              "Thái Âm"
+            ]
+          },
+          "stem_contains": "Bính"
+        },
+        {
+          "cung_menh": {
+            "branches_in": [
+              "Ngọ"
+            ],
+            "stars_all": [
+              "Kình Dương",
+              "Thiên Đồng",
+              "Thái Âm"
+            ]
+          },
+          "stem_contains": "Mậu"
+        },
+        {
+          "cung_menh": {
+            "branches_in": [
+              "Ngọ"
+            ],
+            "stars_all": [
+              "Kình Dương",
+              "Tham Lang"
+            ]
+          },
+          "stem_contains": "Bính"
+        },
+        {
+          "cung_menh": {
+            "branches_in": [
+              "Ngọ"
+            ],
+            "stars_all": [
+              "Kình Dương",
+              "Tham Lang"
+            ]
+          },
+          "stem_contains": "Mậu"
+        }
+      ]
     }
   },
   {
@@ -647,8 +745,7 @@
           "Thiên Cơ"
         ],
         "branches_in": [
-          "Mão",
-          "Dậu"
+          "Mão"
         ]
       }
     }
@@ -663,6 +760,12 @@
     "binh_chu": "1. Thiên Khôi, Thiên Việt một sao tại cung mệnh, một sao tại cung thân. 2. Hoặc Thiên Khôi, Thiên Việt, một sao tại cung mệnh, một sao tại cung thiên di, nếu cung thân đóng tại cung thiên di càng tốt. Chủ tinh tại cung mệnh cần phải miếu vượng, cung tam phương, tứ chính có cát tinh gia hội, mới được coi là hợp cách. Chủ về có học thức, học vấn cao, là người đoan chính, hay giúp đỡ người khác, đồng thời cũng được nhiều người giúp đỡ, gặp dữ hóa lành, biến họa thành phúc, giàu sang. Nếu mệnh không gặp cát tinh, cho dù có Khôi, Việt, tuy được người trợ giúp, nhưng cũng chỉ là mệnh bình thường Ưu...",
     "uu_khuyet_diem": "Ưu điểm: Văn chương xuất chúng, được quý nhân phò trợ",
     "conditions": {
+      "cung_menh": {
+        "stars_any": [
+          "Thiên Khôi",
+          "Thiên Việt"
+        ]
+      },
       "tam_phuong_tu_chinh": {
         "stars_required": [
           "Thiên Khôi",
@@ -682,13 +785,25 @@
     "binh_chu": "1. Sao Hóa Lộc và Hóa Quyền cùng tại cung mệnh là thuộc cách cục này. Cụ thể như sau: - Người sinh năm Ất, sao Thiên Cơ, Thiên Lương trấn mệnh tại Thìn, Tuất, Thiên Cơ hóa Lộc, Thiên Lương hóa Quyền. - Người sinh năm Đinh, sao Thiên Đồng, Thái Âm trấn mệnh tại Tý, Ngọ, Thái Âm hóa Lộc, Thiên Đồng hóa Quyền. - Người sinh năm Kỷ, sao Vũ Khúc, Tham Lang trấn mệnh tại Sửu, Mùi, Vũ Khúc hóa Lộc, Tham Lang hóa Quyền. - Người sinh năm Tân, sao Cự Môn, Thái Dương trấn mệnh tại cung Dần, Thân, Cự Môn hóa Lộc, Thái Dương hóa Quyền. Các sao tại cung mệnh cần phải miếu vượng, tại cung tam phương tứ chính...",
     "uu_khuyet_diem": "",
     "conditions": {
-      "tam_phuong_tu_chinh": {
-        "stars_required": [
-          "Hóa Quyền",
-          "Hóa Lộc"
-        ],
-        "min_count": 2
-      }
+      "any_of": [
+        {
+          "cung_menh": {
+            "stars_all": [
+              "Hóa Quyền",
+              "Hóa Lộc"
+            ]
+          }
+        },
+        {
+          "tam_phuong_tu_chinh": {
+            "stars_required": [
+              "Hóa Quyền",
+              "Hóa Lộc"
+            ],
+            "min_count": 2
+          }
+        }
+      ]
     }
   },
   {
@@ -701,14 +816,20 @@
     "binh_chu": "Trong ba sao Hóa là Hóa Lộc, Hóa Quyền, Hóa Khoa, có hai sao nằm hai bên cung mệnh (giáp mệnh) là hợp với cách cục này. Cụ thể như sau: 1. Người sinh năm Giáp, Thiên Đồng trấn mệnh tại Tỵ Hợi hai cung bên cạnh là Phá Quân hóa Quyền và Vũ Khúc hóa Khoa. 2. Người sinh năm Ất, Tử Vi, Thiên Tướng trấn mệnh tại Thìn, Tuất, hai cung bên cạnh là Thiên Cơ hóa Lộc, Thiên Lương hóa Quyền, đồng thời sao Tử Vi tại cung mệnh lại được hóa Khoa. 3. Người sinh năm Đinh, Vũ Khúc, Thiên Phủ trấn mệnh tại cung Tý, Ngọ, hai cung bên cạnh là Thái Âm hóa Lộc và Thiên Đồng hóa Quyền. 4. Người sinh năm Kỷ, Thái Âm, T...",
     "uu_khuyet_diem": "",
     "conditions": {
-      "giap_cung": {
-        "stars_required": [
+      "giap_cung_pairs": [
+        [
           "Hóa Khoa",
-          "Hóa Quyền",
+          "Hóa Quyền"
+        ],
+        [
+          "Hóa Khoa",
           "Hóa Lộc"
         ],
-        "min_count": 2
-      }
+        [
+          "Hóa Quyền",
+          "Hóa Lộc"
+        ]
+      ]
     }
   },
   {
@@ -721,13 +842,12 @@
     "binh_chu": "Tức Lộc Tồn, Hóa Lộc nằm ở hai bên cung mệnh, gồm những trường hợp cụ thể sau đây: 1. Người sinh năm Giáp, sao Thiên Lương, Đà La trấn mệnh tại Sửu, cung Dần có Lộc Tồn và cung Tý có Liêm Trinh hóa Lộc kèm hai bên cung Sửu (Đây cũng đồng thời là cách cục Nhật Nguyệt tịnh minh, Tọa quý hướng quý). 2. Người sinh năm Ất, sao Thất Sát, Kình Dương trấn mệnh tại cung Thìn, cung Mão có Lộc Tồn và cung Tỵ có Thiên Cơ hóa Lộc kèm hai bên cung Thìn. 3. Người sinh năm Bính, sao Tham Lang, Kình dương trấn mệnh tại cung Ngọ, cung Tỵ có Lộc Tồn và cung Mùi có Thiên Đồng hóa Lộc kèm hai bên cung Ngọ (Đây cũn...",
     "uu_khuyet_diem": "Ưu điểm: Chức vị tài lộc song toàn, một đời yên ổn, xuất thân phú quý. | Khuyết điểm: Đối với cách cục Quyền Lộc tuần phùng nếu bị Hung tinh, sát",
     "conditions": {
-      "giap_cung": {
-        "stars_required": [
+      "giap_cung_pairs": [
+        [
           "Lộc Tồn",
           "Hóa Lộc"
-        ],
-        "min_count": 2
-      }
+        ]
+      ]
     }
   },
   {
@@ -740,19 +860,39 @@
     "binh_chu": "113 Tức Tham Lang, Vũ Khúc nằm tại bốn cung Mộ (Thìn, Tuất, Sửu, Mùi), trấn giữ hoặc hội chiếu cung thân mệnh. Cách cục này có hai loại: Cung mệnh, cung thân tại Sửu, Mùi, có hai sao Vũ Khúc, Tham Lang trấn thủ. Sao Tham Lang, Vũ Khúc tại cung Thìn, Tuất, một sao trấn mệnh, một sao trấn cung thân. Cung vị tam phương, tứ chính của cung mệnh cần phải có cát tinh mới được coi là phù hợp với cách cục này. Ưa gặp được Lộc Tồn, Phụ, Bật, Xương, Khúc, Khôi, Việt cùng các sao hóa cát, cũng cưa gặp Tham Lang cùng Hỏa Tinh, Linh Tinh đồng cung. Lá số được cách cục này nếu theo nghiệp văn sẽ làm quan to,...",
     "uu_khuyet_diem": "Ưu điểm: Theo nghiệp văn sẽ làm quan lớn, theo nghiệp võ nắm giữ binh | Khuyết điểm: Phần nhiều vận trình tuổi trẻ bất lợi, nên trước nghèo hèn sau",
     "conditions": {
-      "cung_menh": {
-        "branches_in": [
-          "Sửu",
-          "Mùi"
-        ]
-      },
-      "tam_phuong_tu_chinh": {
-        "stars_required": [
-          "Tham Lang",
-          "Vũ Khúc"
-        ],
-        "min_count": 2
-      }
+      "any_of": [
+        {
+          "cung_menh": {
+            "stars_all": [
+              "Tham Lang",
+              "Vũ Khúc"
+            ],
+            "branches_in": [
+              "Sửu",
+              "Mùi"
+            ]
+          }
+        },
+        {
+          "cung_menh": {
+            "branches_in": [
+              "Thìn",
+              "Tuất"
+            ],
+            "stars_any": [
+              "Tham Lang",
+              "Vũ Khúc"
+            ]
+          },
+          "tam_phuong_tu_chinh": {
+            "stars_required": [
+              "Tham Lang",
+              "Vũ Khúc"
+            ],
+            "min_count": 2
+          }
+        }
+      ]
     }
   },
   {
@@ -812,6 +952,10 @@
     "uu_khuyet_diem": "",
     "conditions": {
       "giap_cung_pairs": [
+        [
+          "Tử Vi",
+          "Thiên Phủ"
+        ],
         [
           "Thái Dương",
           "Thái Âm"
@@ -895,7 +1039,9 @@
         "branches_in": [
           "Thân",
           "Mùi"
-        ],
+        ]
+      },
+      "tam_phuong_tu_chinh": {
         "stars_none": [
           "Kình Dương",
           "Đà La",
@@ -915,18 +1061,17 @@
     "binh_chu": "Sao Kình dương, Đà La, Hỏa, Linh trấn mệnh nhập miếu được ba sao Thất Sát, Hóa Lộc , Hóa Quyền miếu vượng hội chiếu, ngoài ra cung vị tam phương, tứ chính của cung mệnh cần có cát tinh mới phù hợp với cách cục này. Sở hữu cách cục này chủ về tính cách cương cường quyết liệt, anh hùng khẳng khái, phải trải qua trùng trùng gian nan nguy hiểm, chết đi sống lại, nên theo nghiệp võ hoặc các nghề mang tính mạo hiểm, đầu cơ sẽ có thành tựu lớn. Người có cách cục này sẽ gặp phải tai họa tù ngục, nếu không gặp cát tinh đồng cung hoặc gia hội, ắt sẽ thành kẻ côn đồ hung dữ, thân thể tàn tật hoặc bị tai...",
     "uu_khuyet_diem": "",
     "conditions": {
-      "tam_phuong_tu_chinh": {
-        "stars_required": [
-          "Thất Sát"
-        ],
-        "min_count": 1
-      },
-      "tam_phuong_sat": {
-        "stars_required": [
+      "cung_menh": {
+        "stars_any": [
           "Kình Dương",
           "Đà La",
           "Hỏa Tinh",
           "Linh Tinh"
+        ]
+      },
+      "tam_phuong_tu_chinh": {
+        "stars_required": [
+          "Thất Sát"
         ],
         "min_count": 1
       },
@@ -1049,16 +1194,36 @@
     "binh_chu": "Mệnh đóng tại cung Sửu, Thái Âm và Thái Dương tại Mùi, Mệnh đóng tại cung Mùi, Thái Dương và Thái Âm tại cung Sửu. Tại cung vị tam phương có sao Lộc Tồn, Khoa, Quyền, Lộc, Tả, Hữu, Xương, Khúc là phù hợp với cách cục này. Ca quyết: Mệnh trung nhật nguyệt hỷ tương phùng Cánh ngộ Khoa Quyền tại hóa trung Thử mệnh võ quan tu kiện tiết Văn quan định chủ vị tam công Nghĩa là: Thái Âm, Thái Dương ưa gặp mặt Nếu gặp Khoa, Quyền được hóa xong Đi theo nghiệp võ được công lớn Quan văn thăng chức đến tam công Kinh văn có viết: \" Mệnh đóng tại Sửu được Thái Dương, Thái Âm chầu về sinh năm Bính, Mậu nhiều...",
     "uu_khuyet_diem": "",
     "conditions": {
-      "cung_menh": {
-        "stars_all": [
-          "Thái Dương",
-          "Thái Âm"
-        ],
-        "branches_in": [
-          "Sửu",
-          "Mùi"
-        ]
-      }
+      "any_of": [
+        {
+          "cung_menh": {
+            "branches_in": [
+              "Sửu"
+            ]
+          },
+          "tam_phuong_tu_chinh": {
+            "stars_required": [
+              "Thái Dương",
+              "Thái Âm"
+            ],
+            "min_count": 2
+          }
+        },
+        {
+          "cung_menh": {
+            "branches_in": [
+              "Mùi"
+            ]
+          },
+          "tam_phuong_tu_chinh": {
+            "stars_required": [
+              "Thái Dương",
+              "Thái Âm"
+            ],
+            "min_count": 2
+          }
+        }
+      ]
     }
   },
   {
