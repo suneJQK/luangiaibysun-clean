@@ -17,13 +17,7 @@ from tu_vi_calculator import calculate_chart
 from chart_sanitizer import normalize_engine_chart
 from tuvi_engine.data_loader import load_cach_cuc
 from tuvi_engine.rules.analysis import analyze_chart
-
-try:
-    from google import genai
-    from google.genai import types
-except Exception:
-    genai = None
-    types = None
+from ai_providers.router import generate as generate_ai, normalize_provider
 
 ROOT = Path(__file__).resolve().parent.parent
 BOOKS_FILE = ROOT / "books_cache.json"
@@ -33,7 +27,7 @@ AI_MODE_DIR = ROOT / "ai_modes"
 WEB_INDEX = ROOT / "index.html"
 AI_MODE_INDEX = ROOT / "ai_mode.html"
 
-app = FastAPI(title="TV AI - Tử Vi Đẩu Số", version="2.4")
+app = FastAPI(title="TV AI - Tử Vi Đẩu Số", version="2.5")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -57,6 +51,7 @@ class BirthRequest(BaseModel):
 class AskRequest(BirthRequest):
     question: str = Field(min_length=1, max_length=8000)
     year: int | None = None
+    provider: str = "gemini"
 
 
 def _load_json(path: Path, default: Any) -> Any:
@@ -160,12 +155,22 @@ def ai_mode_page() -> FileResponse:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"status": "ok", "service": "tv-ai", "version": "2.4"}
+    return {"status": "ok", "service": "tv-ai", "version": "2.5"}
 
 
 @app.get("/api/ai-modes")
 def ai_modes() -> dict[str, Any]:
     return {"modes": _available_ai_modes()}
+
+
+@app.get("/api/ai-providers")
+def ai_providers() -> dict[str, Any]:
+    return {
+        "providers": [
+            {"id": "gemini", "name": "Gemini", "env_key": "GEMINI_API_KEY", "model_env": "GEMINI_MODEL"},
+            {"id": "openai", "name": "ChatGPT / OpenAI", "env_key": "OPENAI_API_KEY", "model_env": "OPENAI_MODEL"},
+        ]
+    }
 
 
 @app.get("/api/google-sheets-test")
@@ -212,25 +217,21 @@ def luan_giai(req: AskRequest, request: Request) -> dict[str, Any]:
         cach_cuc_analysis = chart.get("cach_cuc_analysis", {})
         books = _load_json(BOOKS_FILE, {})
         mode_text, mode_id = _load_ai_mode(request.cookies.get("tv_ai_mode", "standard"))
+        provider_id = normalize_provider(req.provider or request.cookies.get("tv_ai_provider", "gemini"))
         prompt = f'''Năm luận: {req.year or date.today().year}\n\nCHẾ ĐỘ LUẬN GIẢI ĐƯỢC CHỌN:\n{mode_text}\n\nCÂU HỎI:\n{req.question}\n\nDỮ LIỆU LÁ SỐ:\n{_compact(chart)}\n\nBẰNG CHỨNG CÁCH CỤC:\n{_compact(cach_cuc_analysis, 30000)}\n\nQUAN HỆ CUNG:\n{_compact(ai_context.get("relationship_knowledge", {}), 20000)}\n\nCONTEXT AI:\n{_compact(ai_context, 50000)}\n\nTÍNH TOÁN KHÁC:\n{_compact(calc, 30000)}\n\nTÀI LIỆU:\n{_compact(books, 40000)}\n\nQUY TẮC BẮT BUỘC:\n- Chỉ dùng Cách Cục đã match từ engine.\n- Cách Cục lõi và modifier phá/giảm phải được luận riêng rồi tổng hợp.\n- Đối chiếu Đồng cung, Tam Hợp, Xung Chiếu, Nhị Hợp, Giáp Cung và Tuần/Triệt.\n- Không tự an sao, không tự thêm hoặc sửa dữ liệu engine.\n- Nếu không có Cách Cục match, nói rõ là chưa xác định được từ bộ điều kiện hiện tại.'''
 
-        api_key = os.environ.get("GEMINI_API_KEY", "")
-        if not api_key:
-            return {"chart": chart, "calculation": calc, "answer": None, "ai_status": "missing_GEMINI_API_KEY", "ai_mode": mode_id}
-        if genai is None or types is None:
-            raise RuntimeError("google-genai chưa được cài đặt")
-
-        client = genai.Client(api_key=api_key)
-        config = types.GenerateContentConfig(
+        answer, selected_provider = generate_ai(
+            provider=provider_id,
             system_instruction=_system_prompt() + "\nAI chỉ diễn giải dữ liệu từ engine Python local.",
-            temperature=0.2,
-            max_output_tokens=30000,
+            prompt=prompt,
         )
-        response = client.models.generate_content(
-            model=os.environ.get("GEMINI_MODEL", "gemini-3.6-flash"),
-            contents=prompt,
-            config=config,
-        )
-        return {"chart": chart, "calculation": calc, "answer": response.text, "ai_status": "ok", "ai_mode": mode_id}
+        return {
+            "chart": chart,
+            "calculation": calc,
+            "answer": answer,
+            "ai_status": "ok",
+            "ai_mode": mode_id,
+            "ai_provider": selected_provider,
+        }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Không thể luận giải: {type(exc).__name__}: {exc}") from exc
