@@ -31,7 +31,7 @@ ROOT_PROMPT_FILE = ROOT / "system_prompt_tuvi.txt"
 PROMPT_DIR = ROOT / "system_prompts"
 WEB_INDEX = ROOT / "index.html"
 
-app = FastAPI(title="TV AI - Tử Vi Đẩu Số", version="2.1")
+app = FastAPI(title="TV AI - Tử Vi Đẩu Số", version="2.2")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -127,7 +127,26 @@ def root() -> FileResponse:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"status": "ok", "service": "tv-ai", "version": "2.1"}
+    return {"status": "ok", "service": "tv-ai", "version": "2.2"}
+
+
+@app.get("/api/google-sheets-test")
+def google_sheets_test() -> dict[str, Any]:
+    try:
+        import google_sheets_storage as storage
+        result = storage.save_user_profile(
+            user_id="diagnostic",
+            name="_TEST_",
+            ngay_sinh="01/01/2000",
+            gio_sinh="Tý",
+            gioi_tinh="Nam",
+            lich="Dương lịch",
+            time_zone=7,
+            created_at=datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
+        )
+        return {"ok": True, "result": result}
+    except Exception as exc:
+        return {"ok": False, "error_type": type(exc).__name__, "error": str(exc)}
 
 
 @app.get("/api/cach-cuc")
