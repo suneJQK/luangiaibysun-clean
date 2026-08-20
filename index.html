@@ -3,63 +3,127 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0b1020" />
   <title>TV AI · Tử Vi Đẩu Số</title>
   <style>
-    :root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#171717;background:#f6f7f9}
-    body{margin:0}.wrap{max-width:1100px;margin:0 auto;padding:24px}.card{background:#fff;border:1px solid #e3e5e8;border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,0,0,.04)}
-    h1{font-size:28px;margin:0 0 5px}.muted{color:#6b7280;font-size:14px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    label{font-size:13px;font-weight:600;display:block;margin-bottom:6px}input,select,button,textarea{width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d7dbe0;border-radius:9px;font:inherit}button{cursor:pointer;background:#171717;color:#fff;border:none;font-weight:700}.secondary{background:#eef0f2;color:#171717}.row{display:flex;gap:10px}.row>*{flex:1}
-    pre{background:#101214;color:#e9edf1;padding:14px;border-radius:10px;overflow:auto;font-size:12px;white-space:pre-wrap}.pill{display:inline-block;border-radius:999px;padding:5px 9px;background:#eef0f2;font-size:12px;margin:3px}.ok{background:#e9f8ee;color:#146c2e}.warn{background:#fff6df;color:#8a5a00}
-    @media(max-width:800px){.grid{grid-template-columns:1fr 1fr}.grid2{grid-template-columns:1fr}}@media(max-width:500px){.grid{grid-template-columns:1fr}}
+    :root{--bg:#070b14;--panel:#0d1425;--panel2:#111a2d;--line:#22304a;--text:#eef3ff;--muted:#8e9ab2;--gold:#d7b46a;--gold2:#f0d595;--green:#59d28b;--red:#ef7b7b;--blue:#73a7ff;--shadow:0 18px 48px rgba(0,0,0,.28);--radius:18px}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at 15% 0%,#16233f 0,#070b14 34%),#070b14;color:var(--text);font:14px/1.55 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    button,input,select,textarea{font:inherit}.shell{max-width:1440px;margin:auto;padding:24px}.topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px}.brand{display:flex;gap:13px;align-items:center}.logo{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,#e0c078,#8e6930);color:#111;font-size:25px;font-weight:900;box-shadow:0 10px 28px rgba(215,180,106,.22)}.brand h1{margin:0;font-size:22px;letter-spacing:.2px}.brand p{margin:2px 0 0;color:var(--muted);font-size:12px}.statusbar{display:flex;gap:8px;align-items:center}.status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 12px rgba(89,210,139,.7)}.badge{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid var(--line);background:rgba(255,255,255,.025);border-radius:999px;color:var(--muted);font-size:12px}.hero{display:grid;grid-template-columns:1.05fr .95fr;gap:18px;margin-bottom:18px}.panel{background:linear-gradient(180deg,rgba(17,26,45,.98),rgba(10,16,29,.98));border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}.hero-card{padding:28px}.hero-card h2{font-size:34px;line-height:1.1;margin:0 0 10px}.hero-card h2 span{color:var(--gold2)}.hero-card p{max-width:680px;color:var(--muted);margin:0 0 20px}.hero-points{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.hero-point{padding:14px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.02)}.hero-point b{display:block;font-size:18px;color:var(--gold2);margin-bottom:2px}.hero-point span{color:var(--muted);font-size:12px}.form-card{padding:22px}.section-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.section-title h3{margin:0;font-size:16px}.section-title small{color:var(--muted)}.form-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.field label{display:block;color:#b9c3d8;font-size:12px;margin:0 0 6px}.field input,.field select,.question{width:100%;padding:11px 12px;color:var(--text);background:#0a1120;border:1px solid #2a3853;border-radius:12px;outline:none}.field input:focus,.field select:focus,.question:focus{border-color:#6e8fc8;box-shadow:0 0 0 3px rgba(115,167,255,.12)}.actions{display:flex;gap:10px;margin-top:14px}.btn{border:0;border-radius:12px;padding:11px 16px;font-weight:800;cursor:pointer;transition:.2s transform,.2s opacity;background:linear-gradient(135deg,#e0c078,#b68b42);color:#17130b;box-shadow:0 12px 24px rgba(215,180,106,.16)}.btn:hover{transform:translateY(-1px)}.btn.secondary{background:#18233a;color:#dce5f8;border:1px solid #2d3c58;box-shadow:none}.btn:disabled{opacity:.55;cursor:not-allowed;transform:none}.message{margin-top:12px;padding:10px 12px;border-radius:12px;background:#0a1120;border:1px solid var(--line);color:var(--muted)}.message.ok{border-color:#24553c;color:#a9e6bf}.message.warn{border-color:#604d25;color:#edd18f}
+    .dashboard{display:none}.dashboard.active{display:block}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}.stat{padding:15px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#111b30,#0c1321)}.stat small{display:block;color:var(--muted);margin-bottom:3px}.stat strong{font-size:20px}.nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.tab{border:1px solid var(--line);background:#0b1220;color:#aeb9cf;padding:9px 12px;border-radius:10px;cursor:pointer}.tab.active{color:#fff;border-color:#8c713e;background:linear-gradient(180deg,#2b2417,#17140d)}.tabpane{display:none}.tabpane.active{display:block}
+    .palace-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.palace{padding:15px;border:1px solid var(--line);border-radius:15px;background:linear-gradient(180deg,#101a2e,#0c1322);cursor:pointer;transition:.18s}.palace:hover{border-color:#51678e;transform:translateY(-2px)}.palace.menh{border-color:#8f753f;box-shadow:inset 0 0 0 1px rgba(215,180,106,.15)}.palace-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.palace-name{font-weight:800}.palace-chi{color:var(--gold2);font-size:12px}.mini{color:var(--muted);font-size:12px;margin-top:6px}.stars{margin-top:9px;display:flex;flex-wrap:wrap;gap:5px}.star{padding:4px 7px;border-radius:999px;background:#17223a;border:1px solid #283957;color:#dce7fb;font-size:11px}.star.main{background:#2a2315;border-color:#755e32;color:#f2d797}.star.bad{border-color:#653a3a;color:#f1a2a2}.empty{color:#66738b;font-size:12px}
+    .split{display:grid;grid-template-columns:1.05fr .95fr;gap:14px}.list{display:grid;gap:10px}.cach{padding:16px;border:1px solid var(--line);border-radius:14px;background:#0d1628}.cach-top{display:flex;justify-content:space-between;gap:12px}.cach h4{margin:0;font-size:15px}.cach p{margin:8px 0;color:var(--muted)}.evidence{margin-top:10px;padding:10px 12px;border-radius:10px;background:#09111f;border:1px dashed #30405d}.evidence summary{cursor:pointer;color:#c8d4ea}.risk{border-color:#5b3434;background:linear-gradient(180deg,#1b1217,#100d13)}.risk h4{color:#ffb0b0}.empty-state{padding:28px;text-align:center;border:1px dashed #2d3b56;border-radius:14px;color:var(--muted)}
+    .ai-grid{display:grid;grid-template-columns:1fr 320px;gap:14px}.chat{min-height:420px;display:flex;flex-direction:column}.chatbox{flex:1;padding:16px;border:1px solid var(--line);border-radius:14px;background:#09111f;overflow:auto}.bubble{max-width:88%;padding:12px 14px;border-radius:14px;margin-bottom:10px;white-space:pre-wrap}.bubble.user{margin-left:auto;background:#233250}.bubble.ai{background:#121d30;border:1px solid #263756}.question{min-height:100px;resize:vertical;margin-top:10px}.side-card{padding:16px}.side-card h4{margin:0 0 9px}.check{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);color:var(--muted)}.check:last-child{border:0}.good{color:#8fe2ac}.gold{color:var(--gold2)}
+    .json{background:#070d18;border:1px solid var(--line);border-radius:14px;padding:14px;overflow:auto;max-height:560px;color:#d7e1f1;font-size:12px;white-space:pre-wrap}.footer{padding:18px 0 6px;color:#66738b;font-size:12px;text-align:center}.loading{display:inline-flex;align-items:center;gap:8px}.spinner{width:14px;height:14px;border:2px solid #465571;border-top-color:var(--gold2);border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+    @media(max-width:1100px){.hero,.split,.ai-grid{grid-template-columns:1fr}.form-grid{grid-template-columns:repeat(2,1fr)}.stats{grid-template-columns:repeat(2,1fr)}.palace-grid{grid-template-columns:repeat(3,1fr)}}
+    @media(max-width:700px){.shell{padding:14px}.hero-card h2{font-size:28px}.hero-points{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr}.palace-grid{grid-template-columns:1fr 1fr}.topbar{align-items:flex-start}.statusbar{display:none}}
+    @media(max-width:460px){.palace-grid{grid-template-columns:1fr}.actions{flex-direction:column}.stats{grid-template-columns:1fr 1fr}.nav{overflow:auto;flex-wrap:nowrap}.tab{white-space:nowrap}}
   </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="card">
-    <h1>☯️ TV AI</h1>
-    <div class="muted">Engine Python V2 → quan hệ cung → Cách Cục → AI luận giải</div>
-  </div>
+<div class="shell">
+  <header class="topbar">
+    <div class="brand"><div class="logo">☯</div><div><h1>TV AI · Tử Vi Đẩu Số</h1><p>Engine Python V2 · Cách Cục · Quan hệ cung · AI luận giải</p></div></div>
+    <div class="statusbar"><span class="badge"><span class="status-dot"></span> Engine online</span><span class="badge">V2.0</span></div>
+  </header>
 
-  <div class="card">
-    <h2>① Lập lá số</h2>
-    <div class="grid">
-      <div><label>Ngày</label><input id="day" type="number" min="1" max="31" value="1"></div>
-      <div><label>Tháng</label><input id="month" type="number" min="1" max="12" value="1"></div>
-      <div><label>Năm</label><input id="year" type="number" min="1800" max="2200" value="1996"></div>
-      <div><label>Giới tính</label><select id="gender"><option>Nam</option><option>Nữ</option></select></div>
-      <div><label>Giờ sinh</label><select id="hour">
-        <option>Tý</option><option>Sửu</option><option>Dần</option><option>Mão</option><option>Thìn</option><option>Tỵ</option><option>Ngọ</option><option>Mùi</option><option>Thân</option><option>Dậu</option><option>Tuất</option><option>Hợi</option>
-      </select></div>
-      <div><label>Lịch</label><select id="calendar"><option value="true">Dương lịch</option><option value="false">Âm lịch</option></select></div>
-      <div><label>Múi giờ</label><input id="tz" type="number" value="7"></div>
-      <div><label>Họ tên</label><input id="name" value=""></div>
+  <section class="hero">
+    <div class="panel hero-card">
+      <h2>Luận lá số bằng <span>dữ liệu có cấu trúc</span></h2>
+      <p>Lập lá số bằng engine Python, xác định Cách Cục theo vị trí sao và quan hệ cung, sau đó gửi đúng bằng chứng cho AI để luận giải.</p>
+      <div class="hero-points">
+        <div class="hero-point"><b>12</b><span>Cung địa bàn</span></div>
+        <div class="hero-point"><b>51</b><span>Cách Cục dữ liệu</span></div>
+        <div class="hero-point"><b>V2</b><span>Evidence → AI</span></div>
+      </div>
     </div>
-    <div style="margin-top:12px"><button onclick="lapSo()">🧭 LẬP LÁ SỐ</button></div>
-    <div id="status" style="margin-top:12px"></div>
-  </div>
+    <div class="panel form-card">
+      <div class="section-title"><h3>① Thông tin sinh</h3><small>Điền chính xác để engine tính</small></div>
+      <div class="form-grid">
+        <div class="field"><label>Ngày</label><input id="day" type="number" min="1" max="31" value="1"></div>
+        <div class="field"><label>Tháng</label><input id="month" type="number" min="1" max="12" value="1"></div>
+        <div class="field"><label>Năm</label><input id="year" type="number" min="1800" max="2200" value="1996"></div>
+        <div class="field"><label>Giới tính</label><select id="gender"><option>Nam</option><option>Nữ</option></select></div>
+        <div class="field"><label>Giờ sinh</label><select id="hour"><option>Tý</option><option>Sửu</option><option>Dần</option><option>Mão</option><option>Thìn</option><option>Tỵ</option><option>Ngọ</option><option>Mùi</option><option>Thân</option><option>Dậu</option><option>Tuất</option><option>Hợi</option></select></div>
+        <div class="field"><label>Lịch</label><select id="calendar"><option value="true">Dương lịch</option><option value="false">Âm lịch</option></select></div>
+        <div class="field"><label>Múi giờ</label><input id="tz" type="number" step="1" value="7"></div>
+        <div class="field"><label>Họ tên</label><input id="name" placeholder="Không bắt buộc"></div>
+      </div>
+      <div class="actions"><button class="btn" id="buildBtn" onclick="lapSo()">🧭 LẬP LÁ SỐ</button><button class="btn secondary" onclick="resetAll()">↺ Xóa dữ liệu</button></div>
+      <div id="status"></div>
+    </div>
+  </section>
 
-  <div id="result" style="display:none">
-    <div class="card"><h2>② Tóm tắt</h2><div id="summary"></div></div>
-    <div class="card"><h2>③ Cách Cục</h2><div id="cach"></div></div>
-    <div class="card"><h2>④ 12 Cung</h2><div id="palaces"></div></div>
-    <div class="card"><h2>⑤ AI luận giải</h2>
-      <textarea id="question" rows="4" placeholder="Ví dụ: Luận cung Mệnh, công danh và tài lộc..."></textarea>
-      <div style="margin-top:10px"><button onclick="askAI()">🤖 LUẬN GIẢI</button></div>
-      <div id="answer" style="margin-top:12px"></div>
+  <main id="dashboard" class="dashboard">
+    <div class="stats">
+      <div class="stat"><small>Mệnh</small><strong id="statMenh">—</strong></div>
+      <div class="stat"><small>Thân</small><strong id="statThan">—</strong></div>
+      <div class="stat"><small>Cách Cục</small><strong id="statCach">0</strong></div>
+      <div class="stat"><small>Điểm cảnh báo</small><strong id="statMod">0</strong></div>
     </div>
-    <div class="card"><h2>⑥ JSON</h2><pre id="json"></pre></div>
-  </div>
+
+    <nav class="nav">
+      <button class="tab active" data-tab="overview">Tổng quan</button>
+      <button class="tab" data-tab="palaces">12 Cung</button>
+      <button class="tab" data-tab="cach">Cách Cục</button>
+      <button class="tab" data-tab="ai">AI luận giải</button>
+      <button class="tab" data-tab="json">Dữ liệu</button>
+    </nav>
+
+    <section id="tab-overview" class="tabpane active">
+      <div class="split">
+        <div class="panel" style="padding:18px"><div class="section-title"><h3>Tổng quan Thiên Bàn</h3><small id="metaLine">—</small></div><div id="overviewCards" class="list"></div></div>
+        <div class="panel" style="padding:18px"><div class="section-title"><h3>Trạng thái engine</h3><small>Kiểm tra dữ liệu</small></div><div class="check"><span>12 cung</span><span class="good" id="check12">—</span></div><div class="check"><span>Cách Cục</span><span class="gold" id="checkCach">—</span></div><div class="check"><span>Quan hệ cung</span><span class="good">Tam Hợp · Xung · Nhị Hợp · Giáp</span></div><div class="check"><span>AI context</span><span class="good" id="checkAI">—</span></div></div>
+      </div>
+    </section>
+
+    <section id="tab-palaces" class="tabpane"><div class="panel" style="padding:18px"><div class="section-title"><h3>12 Cung</h3><small>Bấm vào một cung để xem sao</small></div><div id="palaceGrid" class="palace-grid"></div></div></section>
+
+    <section id="tab-cach" class="tabpane"><div class="panel" style="padding:18px"><div class="section-title"><h3>Cách Cục & bằng chứng</h3><small id="cachCount">0 mục match</small></div><div id="cachList" class="list"></div></div></section>
+
+    <section id="tab-ai" class="tabpane">
+      <div class="ai-grid">
+        <div class="panel chat" style="padding:18px"><div class="section-title"><h3>AI luận giải</h3><small>AI chỉ dùng bằng chứng từ engine</small></div><div id="chatbox" class="chatbox"><div class="empty-state">Hãy đặt câu hỏi về Mệnh, Tài Bạch, Quan Lộc, tình cảm, đại vận hoặc Cách Cục.</div></div><textarea id="question" class="question" placeholder="Ví dụ: Luận kỹ Cách Quyền Lộc Tuần Phùng và các yếu tố phá Cách..."></textarea><div class="actions"><button class="btn" id="aiBtn" onclick="askAI()">🤖 LUẬN GIẢI</button><button class="btn secondary" onclick="clearChat()">Xóa hội thoại</button></div><div id="aiStatus"></div></div>
+        <div class="panel side-card"><h4>AI sẽ nhận</h4><div class="check"><span>12 cung</span><b class="good">✓</b></div><div class="check"><span>Vị trí sao</span><b class="good">✓</b></div><div class="check"><span>Tam Phương Tứ Chính</span><b class="good">✓</b></div><div class="check"><span>Xung Chiếu</span><b class="good">✓</b></div><div class="check"><span>Nhị Hợp</span><b class="good">✓</b></div><div class="check"><span>Giáp Cung</span><b class="good">✓</b></div><div class="check"><span>Cách Cục match</span><b class="good">✓</b></div><div class="check"><span>Modifier phá/giảm</span><b class="good">✓</b></div></div>
+      </div>
+    </section>
+
+    <section id="tab-json" class="tabpane"><div class="panel" style="padding:18px"><div class="section-title"><h3>JSON chuẩn từ engine</h3><button class="btn secondary" style="width:auto" onclick="downloadJSON()">⬇ Tải JSON</button></div><pre id="jsonView" class="json">—</pre></div></section>
+  </main>
+
+  <div class="footer">TV AI · Python deterministic engine → Cách Cục → evidence → AI</div>
 </div>
+
 <script>
 let chart=null;
 const $=id=>document.getElementById(id);
-async function call(url,options={}){const r=await fetch(url,{headers:{'Content-Type':'application/json'},...options});const data=await r.json();if(!r.ok)throw new Error(data.detail||'Request failed');return data;}
-function starNames(list){return (list||[]).map(x=>x.ten?`${x.ten}${x.dac_tinh?` [${x.dac_tinh}]`:''}`:'').filter(Boolean).join(', ')}
-function showChart(c){chart=c;$('result').style.display='block';const tb=c.thien_ban||{};$('summary').innerHTML=`<span class="pill ok">Mệnh: ${tb.menh||'—'}</span><span class="pill">Thân: ${tb.than_chu||'—'}</span><span class="pill">Cách Cục: ${(c.cach_cuc_analysis||{}).matched_count||0}</span>`;
-const matched=(c.cach_cuc_analysis||{}).matched||[];$('cach').innerHTML=matched.length?matched.map(x=>`<div style="border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:10px"><b>${x.name}</b><div class="muted">${x.category||''}</div><div>${x.description||''}</div><pre>${JSON.stringify(x.matched_branches||[],null,2)}</pre></div>`).join(''):'<span class="pill warn">Chưa có Cách Cục match</span>';
-const rows=Object.entries(c['12_cung']||{}).map(([name,d])=>`<div style="border-bottom:1px solid #eee;padding:10px 0"><b>${name}${d.than_cu?' · Thân cư':''}</b> · ${d.dia_chi||''}<br><span class="muted">Chính tinh:</span> ${starNames(d.chinh_tinh)}<br><span class="muted">Phụ tinh:</span> ${starNames(d.phu_tinh)}<br><span class="muted">Tuần/Triệt:</span> ${d.tuan?'Tuần ':''}${d.triet?'Triệt':''}</div>`).join('');$('palaces').innerHTML=rows||'—';$('json').textContent=JSON.stringify(c,null,2);}
-async function lapSo(){ $('status').innerHTML='Đang lập lá số...'; try{ const data=await call('/api/lap-so',{method:'POST',body:JSON.stringify({ngay:+$('day').value,thang:+$('month').value,nam:+$('year').value,gio_sinh:$('hour').value,gioi_tinh:$('gender').value,ten:$('name').value,duong_lich:$('calendar').value==='true',time_zone:+$('tz').value})}); showChart(data); $('status').innerHTML='<span class="pill ok">Đã lập lá số</span>'; }catch(e){$('status').innerHTML=`<span class="pill warn">${e.message}</span>`}}
-async function askAI(){ if(!chart)return; $('answer').innerHTML='Đang gọi AI...'; try{const req={ngay:+$('day').value,thang:+$('month').value,nam:+$('year').value,gio_sinh:$('hour').value,gioi_tinh:$('gender').value,ten:$('name').value,duong_lich:$('calendar').value==='true',time_zone:+$('tz').value,question:$('question').value,year:new Date().getFullYear()}; const data=await call('/api/luan-giai',{method:'POST',body:JSON.stringify(req)}); $('answer').innerHTML=data.answer?`<pre>${data.answer.replace(/</g,'&lt;')}</pre>`:'<span class="pill warn">Chưa cấu hình GEMINI_API_KEY trên Vercel</span>'; }catch(e){$('answer').innerHTML=`<span class="pill warn">${e.message}</span>`}}
+const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+const fmtList=a=>(a||[]).filter(x=>x&&x.ten).map(x=>`<span class="star ${x.loai==='chinh_tinh'?'main':''}">${esc(x.ten)}${x.dac_tinh?` <small>[${esc(x.dac_tinh)}]</small>`:''}</span>`).join('');
+async function call(url,options={}){const r=await fetch(url,{headers:{'Content-Type':'application/json'},...options});let data={};try{data=await r.json()}catch{}if(!r.ok)throw new Error(data.detail||`HTTP ${r.status}`);return data}
+function setStatus(text,type=''){ $('status').innerHTML=`<div class="message ${type}">${text}</div>` }
+function showLoading(btn,text){btn.disabled=true;btn.innerHTML=`<span class="loading"><span class="spinner"></span>${text}</span>`}
+function restoreBtn(btn,text){btn.disabled=false;btn.innerHTML=text}
+function statText(v){return v||'—'}
+function relationCount(){return Object.values(chart?.cach_cuc_analysis?.modifiers||{}).length||0}
+function renderChart(c){
+  chart=c;$('dashboard').classList.add('active');
+  const tb=c.thien_ban||{},ca=c.cach_cuc_analysis||{},matched=ca.matched||[];
+  $('statMenh').textContent=statText(tb.menh);$('statThan').textContent=statText(tb.than_chu);$('statCach').textContent=ca.matched_count??matched.length;$('statMod').textContent=relationCount();
+  $('metaLine').textContent=`${tb.can_nam||'—'} · ${tb.chi_nam||'—'} · ${tb.ten_cuc||'—'}`;
+  $('check12').textContent=Object.keys(c['12_cung']||{}).length===12?'Đủ 12 cung':'Thiếu dữ liệu';$('checkCach').textContent=`${matched.length} match`;$('checkAI').textContent=c.ai_context?'Sẵn sàng':'Không có';
+  $('overviewCards').innerHTML=`<div class="cach"><h4>Mệnh</h4><p>${esc(tb.menh||'—')} · Thân ${esc(tb.than_chu||'—')}</p><div class="mini">Mệnh chủ: ${esc(tb.menh_chu||'—')} · Thân chủ: ${esc(tb.than_chu||'—')}</div></div><div class="cach"><h4>Cục</h4><p>${esc(tb.ten_cuc||'—')}</p><div class="mini">Âm dương: ${esc(tb.am_duong_menh||'—')} · Sinh khắc: ${esc(tb.sinh_khac||'—')}</div></div>`;
+  const palaces=Object.entries(c['12_cung']||{});
+  $('palaceGrid').innerHTML=palaces.map(([name,d])=>{const isMenh=(name||'').toLowerCase().includes('mệnh');return `<article class="palace ${isMenh?'menh':''}" onclick="openPalace('${esc(name)}')"><div class="palace-head"><div class="palace-name">${esc(name)}${d.than_cu?' · Thân cư':''}</div><div class="palace-chi">${esc(d.dia_chi||'—')}</div></div><div class="mini">${esc(d.can_chi||'—')} · ${esc(d.vong_trang_sinh||'—')}</div><div class="stars">${fmtList(d.chinh_tinh).replaceAll('class="star"','class="star main"')}${fmtList(d.phu_tinh)}</div><div class="mini">${d.tuan?'Tuần ':''}${d.triet?'Triệt':''}</div></article>`}).join('')||'<div class="empty-state">Chưa có dữ liệu 12 cung.</div>';
+  $('cachCount').textContent=`${matched.length} mục match`;
+  $('cachList').innerHTML=matched.length?matched.map((x,i)=>`<article class="cach"><div class="cach-top"><div><h4>${esc(x.name)}</h4><div class="mini">${esc(x.category||'')}</div></div><span class="badge">#${i+1}</span></div><p>${esc(x.description||'')}</p>${x.reason?`<div class="mini">${esc(x.reason)}</div>`:''}${x.matched_branches?.length?`<details class="evidence"><summary>Evidence vị trí sao</summary><pre class="json" style="max-height:280px;margin-top:8px">${esc(JSON.stringify(x.matched_branches,null,2))}</pre></details>`:''}${x.evidence?`<details class="evidence"><summary>Evidence quan hệ cung</summary><pre class="json" style="max-height:280px;margin-top:8px">${esc(JSON.stringify(x.evidence,null,2))}</pre></details>`:''}</article>`).join(''):'<div class="empty-state">Chưa có Cách Cục match từ bộ điều kiện hiện tại.</div>';
+  $('jsonView').textContent=JSON.stringify(c,null,2);
+}
+function openPalace(name){const d=chart?.['12_cung']?.[name];if(!d)return;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab==='palaces'));document.querySelectorAll('.tabpane').forEach(x=>x.classList.toggle('active',x.id==='tab-palaces'));const title=`${name}${d.than_cu?' · Thân cư':''}`;$('status').innerHTML=`<div class="message"><b>${esc(title)}</b> · ${esc(d.can_chi||'')} · ${esc(d.dia_chi||'')}<br><span class="gold">Chính tinh:</span> ${esc((d.chinh_tinh||[]).map(x=>x.ten).join(', ')||'—')}<br><span class="gold">Phụ tinh:</span> ${esc((d.phu_tinh||[]).map(x=>x.ten).join(', ')||'—')}</div>`;window.scrollTo({top:$('dashboard').offsetTop-10,behavior:'smooth'})}
+async function lapSo(){const btn=$('buildBtn');showLoading(btn,'Đang lập lá số...');setStatus('Engine đang tính lá số và Cách Cục...');try{const data=await call('/api/lap-so',{method:'POST',body:JSON.stringify({ngay:+$('day').value,thang:+$('month').value,nam:+$('year').value,gio_sinh:$('hour').value,gioi_tinh:$('gender').value,ten:$('name').value,duong_lich:$('calendar').value==='true',time_zone:+$('tz').value})});renderChart(data);setStatus(`Đã lập lá số · ${data.cach_cuc_analysis?.matched_count??0} Cách Cục match.`,'ok');window.scrollTo({top:$('dashboard').offsetTop-10,behavior:'smooth'});}catch(e){setStatus(e.message,'warn')}finally{restoreBtn(btn,'🧭 LẬP LÁ SỐ')}}
+async function askAI(){if(!chart){setStatus('Hãy lập lá số trước.','warn');return}const q=$('question').value.trim();if(!q){$('question').focus();return}const btn=$('aiBtn');showLoading(btn,'AI đang luận...');const box=$('chatbox');if(box.querySelector('.empty-state'))box.innerHTML='';box.insertAdjacentHTML('beforeend',`<div class="bubble user">${esc(q)}</div>`);try{const req={ngay:+$('day').value,thang:+$('month').value,nam:+$('year').value,gio_sinh:$('hour').value,gioi_tinh:$('gender').value,ten:$('name').value,duong_lich:$('calendar').value==='true',time_zone:+$('tz').value,question:q,year:new Date().getFullYear()};const data=await call('/api/luan-giai',{method:'POST',body:JSON.stringify(req)});const answer=data.answer||'Chưa có câu trả lời. Kiểm tra GEMINI_API_KEY trên Vercel.';box.insertAdjacentHTML('beforeend',`<div class="bubble ai">${esc(answer)}</div>`);$('aiStatus').innerHTML=`<div class="message ${data.ai_status==='ok'?'ok':'warn'}">Trạng thái AI: ${esc(data.ai_status||'unknown')}</div>`;$('question').value='';box.scrollTop=box.scrollHeight}catch(e){box.insertAdjacentHTML('beforeend',`<div class="bubble ai">Không thể gọi AI: ${esc(e.message)}</div>`);$('aiStatus').innerHTML='<div class="message warn">Kiểm tra API và GEMINI_API_KEY trên Vercel.</div>'}finally{restoreBtn(btn,'🤖 LUẬN GIẢI')}}
+function clearChat(){$('chatbox').innerHTML='<div class="empty-state">Hãy đặt câu hỏi về lá số.</div>';$('aiStatus').innerHTML=''}
+function resetAll(){chart=null;$('dashboard').classList.remove('active');$('status').innerHTML='';$('jsonView').textContent='—';clearChat();window.scrollTo({top:0,behavior:'smooth'})}
+function downloadJSON(){if(!chart)return;const blob=new Blob([JSON.stringify(chart,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='la-so-tu-vi.json';a.click();URL.revokeObjectURL(url)}
+document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.tabpane').forEach(x=>x.classList.remove('active'));btn.classList.add('active');$('tab-'+btn.dataset.tab).classList.add('active')}));
 </script>
 </body>
 </html>
