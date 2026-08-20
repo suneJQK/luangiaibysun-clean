@@ -1,0 +1,7 @@
+{
+  "version": "2.0",
+  "count": 109,
+  "source": "tuvi_engine._engine.Sao.py",
+  "notes": "Catalog giữ nguyên ID/tên theo low-level engine; metadata mở rộng được quản lý riêng trong rule layer.",
+  "stars": []
+}
