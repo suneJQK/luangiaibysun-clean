@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TV AI · Tử Vi Đẩu Số</title>
+  <style>
+    :root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#171717;background:#f6f7f9}
+    body{margin:0}.wrap{max-width:1100px;margin:0 auto;padding:24px}.card{background:#fff;border:1px solid #e3e5e8;border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,0,0,.04)}
+    h1{font-size:28px;margin:0 0 5px}.muted{color:#6b7280;font-size:14px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    label{font-size:13px;font-weight:600;display:block;margin-bottom:6px}input,select,button,textarea{width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d7dbe0;border-radius:9px;font:inherit}button{cursor:pointer;background:#171717;color:#fff;border:none;font-weight:700}.secondary{background:#eef0f2;color:#171717}.row{display:flex;gap:10px}.row>*{flex:1}
+    pre{background:#101214;color:#e9edf1;padding:14px;border-radius:10px;overflow:auto;font-size:12px;white-space:pre-wrap}.pill{display:inline-block;border-radius:999px;padding:5px 9px;background:#eef0f2;font-size:12px;margin:3px}.ok{background:#e9f8ee;color:#146c2e}.warn{background:#fff6df;color:#8a5a00}
+    @media(max-width:800px){.grid{grid-template-columns:1fr 1fr}.grid2{grid-template-columns:1fr}}@media(max-width:500px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>☯️ TV AI</h1>
+    <div class="muted">Engine Python V2 → quan hệ cung → Cách Cục → AI luận giải</div>
+  </div>
+
+  <div class="card">
+    <h2>① Lập lá số</h2>
+    <div class="grid">
+      <div><label>Ngày</label><input id="day" type="number" min="1" max="31" value="1"></div>
+      <div><label>Tháng</label><input id="month" type="number" min="1" max="12" value="1"></div>
+      <div><label>Năm</label><input id="year" type="number" min="1800" max="2200" value="1996"></div>
+      <div><label>Giới tính</label><select id="gender"><option>Nam</option><option>Nữ</option></select></div>
+      <div><label>Giờ sinh</label><select id="hour">
+        <option>Tý</option><option>Sửu</option><option>Dần</option><option>Mão</option><option>Thìn</option><option>Tỵ</option><option>Ngọ</option><option>Mùi</option><option>Thân</option><option>Dậu</option><option>Tuất</option><option>Hợi</option>
+      </select></div>
+      <div><label>Lịch</label><select id="calendar"><option value="true">Dương lịch</option><option value="false">Âm lịch</option></select></div>
+      <div><label>Múi giờ</label><input id="tz" type="number" value="7"></div>
+      <div><label>Họ tên</label><input id="name" value=""></div>
+    </div>
+    <div style="margin-top:12px"><button onclick="lapSo()">🧭 LẬP LÁ SỐ</button></div>
+    <div id="status" style="margin-top:12px"></div>
+  </div>
+
+  <div id="result" style="display:none">
+    <div class="card"><h2>② Tóm tắt</h2><div id="summary"></div></div>
+    <div class="card"><h2>③ Cách Cục</h2><div id="cach"></div></div>
+    <div class="card"><h2>④ 12 Cung</h2><div id="palaces"></div></div>
+    <div class="card"><h2>⑤ AI luận giải</h2>
+      <textarea id="question" rows="4" placeholder="Ví dụ: Luận cung Mệnh, công danh và tài lộc..."></textarea>
+      <div style="margin-top:10px"><button onclick="askAI()">🤖 LUẬN GIẢI</button></div>
+      <div id="answer" style="margin-top:12px"></div>
+    </div>
+    <div class="card"><h2>⑥ JSON</h2><pre id="json"></pre></div>
+  </div>
+</div>
+<script>
+let chart=null;
+const $=id=>document.getElementById(id);
+async function call(url,options={}){const r=await fetch(url,{headers:{'Content-Type':'application/json'},...options});const data=await r.json();if(!r.ok)throw new Error(data.detail||'Request failed');return data;}
+function starNames(list){return (list||[]).map(x=>x.ten?`${x.ten}${x.dac_tinh?` [${x.dac_tinh}]`:''}`:'').filter(Boolean).join(', ')}
+function showChart(c){chart=c;$('result').style.display='block';const tb=c.thien_ban||{};$('summary').innerHTML=`<span class="pill ok">Mệnh: ${tb.menh||'—'}</span><span class="pill">Thân: ${tb.than_chu||'—'}</span><span class="pill">Cách Cục: ${(c.cach_cuc_analysis||{}).matched_count||0}</span>`;
+const matched=(c.cach_cuc_analysis||{}).matched||[];$('cach').innerHTML=matched.length?matched.map(x=>`<div style="border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:10px"><b>${x.name}</b><div class="muted">${x.category||''}</div><div>${x.description||''}</div><pre>${JSON.stringify(x.matched_branches||[],null,2)}</pre></div>`).join(''):'<span class="pill warn">Chưa có Cách Cục match</span>';
+const rows=Object.entries(c['12_cung']||{}).map(([name,d])=>`<div style="border-bottom:1px solid #eee;padding:10px 0"><b>${name}${d.than_cu?' · Thân cư':''}</b> · ${d.dia_chi||''}<br><span class="muted">Chính tinh:</span> ${starNames(d.chinh_tinh)}<br><span class="muted">Phụ tinh:</span> ${starNames(d.phu_tinh)}<br><span class="muted">Tuần/Triệt:</span> ${d.tuan?'Tuần ':''}${d.triet?'Triệt':''}</div>`).join('');$('palaces').innerHTML=rows||'—';$('json').textContent=JSON.stringify(c,null,2);}
+async function lapSo(){ $('status').innerHTML='Đang lập lá số...'; try{ const data=await call('/api/lap-so',{method:'POST',body:JSON.stringify({ngay:+$('day').value,thang:+$('month').value,nam:+$('year').value,gio_sinh:$('hour').value,gioi_tinh:$('gender').value,ten:$('name').value,duong_lich:$('calendar').value==='true',time_zone:+$('tz').value})}); showChart(data); $('status').innerHTML='<span class="pill ok">Đã lập lá số</span>'; }catch(e){$('status').innerHTML=`<span class="pill warn">${e.message}</span>`}}
+async function askAI(){ if(!chart)return; $('answer').innerHTML='Đang gọi AI...'; try{const req={ngay:+$('day').value,thang:+$('month').value,nam:+$('year').value,gio_sinh:$('hour').value,gioi_tinh:$('gender').value,ten:$('name').value,duong_lich:$('calendar').value==='true',time_zone:+$('tz').value,question:$('question').value,year:new Date().getFullYear()}; const data=await call('/api/luan-giai',{method:'POST',body:JSON.stringify(req)}); $('answer').innerHTML=data.answer?`<pre>${data.answer.replace(/</g,'&lt;')}</pre>`:'<span class="pill warn">Chưa cấu hình GEMINI_API_KEY trên Vercel</span>'; }catch(e){$('answer').innerHTML=`<span class="pill warn">${e.message}</span>`}}
+</script>
+</body>
+</html>
