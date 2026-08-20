@@ -24,8 +24,6 @@ RELATION_KEYS = (
     "giap_cung",
 )
 
-# TuViMCP-compatible aliases. They all operate on the same four-palace
-# Tam Phương Tứ Chính scope; the rule name can still document its intent.
 TAM_PHUONG_ALIASES = {
     "tam_phuong_tu_chinh_aux",
     "tam_phuong_tu_chinh_loc",
@@ -49,6 +47,12 @@ def _palaces(chart: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _normalize_names(names: Iterable[str]) -> set[str]:
     return {str(name).strip().casefold() for name in names if str(name).strip()}
+
+
+def _normalize_palace_name(value: Any) -> str:
+    text = str(value or "").strip().casefold()
+    # UI labels may append metadata, e.g. "Mệnh · Thân cư".
+    return text.split("·", 1)[0].strip()
 
 
 def _star_records(palace: dict[str, Any]) -> list[dict[str, Any]]:
@@ -88,7 +92,6 @@ def _cung_name(palace: dict[str, Any]) -> str:
 
 
 def get_cung_chi(cung: dict[str, Any] | None) -> str:
-    """Extract địa chi from dia_chi/chi or from the final token of cung_ten."""
     if not isinstance(cung, dict):
         return ""
     value = cung.get("dia_chi") or cung.get("chi")
@@ -103,11 +106,12 @@ def _cung_chi(palace: dict[str, Any]) -> str:
 
 
 def get_cung_by_chu(chart: dict[str, Any], name: str) -> dict[str, Any] | None:
-    target = str(name).strip().casefold()
+    target = _normalize_palace_name(name)
     for palace in _palaces(chart):
-        if _cung_name(palace).casefold() == target:
+        palace_name = _normalize_palace_name(_cung_name(palace))
+        if palace_name == target:
             return palace
-        if str(palace.get("cung_chu") or "").strip().casefold() == target:
+        if _normalize_palace_name(palace.get("cung_chu")) == target:
             return palace
     return None
 
@@ -131,7 +135,6 @@ def _offset_palace(chart: dict[str, Any], target: dict[str, Any], offset: int) -
 
 
 def related_palaces(chart: dict[str, Any], target: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
-    """Return actual palace objects in each positional relationship."""
     dong = [target]
     tam_hop = _offset_palace(chart, target, 4) + _offset_palace(chart, target, 8)
     xung = _offset_palace(chart, target, 6)
@@ -217,7 +220,6 @@ def _scope_matches(scope: list[dict[str, Any]], condition: dict[str, Any]) -> bo
 
 
 def match_house_condition(palace: dict[str, Any] | None, condition: dict[str, Any]) -> bool:
-    """Compatibility helper matching TuViMCP-style single-palace predicates."""
     if palace is None:
         return False
     if "branches_in" in condition and _cung_chi(palace) not in set(condition["branches_in"]):
@@ -234,13 +236,11 @@ def match_house_condition(palace: dict[str, Any] | None, condition: dict[str, An
 
 
 def _evaluate_tam_phuong_alias(chart: dict[str, Any], target: dict[str, Any], condition: dict[str, Any]) -> bool:
-    """Evaluate TuViMCP-compatible tam_phuong_* aliases on the canonical scope."""
     scope = related_palaces(chart, target)["tam_phuong_tu_chinh"]
     return bool(scope) and _scope_matches(scope, condition)
 
 
 def evaluate_condition(chart: dict[str, Any], condition: dict[str, Any]) -> bool:
-    """Evaluate one declarative condition against real palace geometry."""
     if not isinstance(condition, dict):
         return False
     if "any_of" in condition:
@@ -250,7 +250,11 @@ def evaluate_condition(chart: dict[str, Any], condition: dict[str, Any]) -> bool
         branches = [x for x in condition["all_of"] if isinstance(x, dict)]
         return bool(branches) and all(evaluate_condition(chart, x) for x in branches)
     if "cung_menh" in condition:
-        return evaluate_condition(chart, {"target": "Mệnh", **condition["cung_menh"]})
+        nested = {"target": "Mệnh", **condition["cung_menh"]}
+        remainder = {k: v for k, v in condition.items() if k != "cung_menh"}
+        if remainder:
+            nested.update(remainder)
+        return evaluate_condition(chart, nested)
 
     target = get_cung_by_chu(chart, str(condition.get("target", "Mệnh")))
     if target is None:
