@@ -2,7 +2,7 @@ name: V2 CI
 
 on:
   push:
-    branches: [main, update/v2-engine]
+    branches: [main, update/v2-engine, fix/cach-cuc-51-rules-20260820]
   pull_request:
     branches: [main]
 
@@ -16,6 +16,16 @@ jobs:
           python-version: '3.11'
       - name: Install dependencies
         run: python -m pip install --upgrade pip && pip install -r requirements.txt
+      - name: Validate rule catalog
+        run: python - <<'PY'
+import json
+p=json.load(open('data/cach_cuc.json', encoding='utf-8'))
+assert len(p) == 51
+assert [x['id'] for x in p] == list(range(1, 52))
+json.load(open('data/cach_cuc_overrides.json', encoding='utf-8'))
+json.load(open('data/cach_cuc_modifiers.json', encoding='utf-8'))
+json.load(open('data/cach_cuc_audit.json', encoding='utf-8'))
+PY
       - name: Export star catalog
         run: python scripts/export_star_catalog.py
       - name: Validate star catalog
