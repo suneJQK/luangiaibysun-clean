@@ -5,63 +5,128 @@ from typing import Any
 
 from tuvi_engine.data_loader import load_cach_cuc
 
-from .evaluator import _normalize_names, _scope_stars, evaluate_condition, related_palaces
+from .evaluator import (
+    _normalize_names,
+    _scope_star_names,
+    evaluate_condition,
+    related_palaces,
+)
 
 
-def _evidence(chart: dict[str, Any], condition: dict[str, Any]) -> dict[str, Any]:
+def _palace_label(palace: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "cung_so": palace.get("cung_so"),
+        "cung": palace.get("cung") or palace.get("cung_ten"),
+        "dia_chi": palace.get("dia_chi") or palace.get("chi"),
+    }
+
+
+def _evidence_for_relation(
+    chart: dict[str, Any],
+    target: dict[str, Any],
+    relation_name: str,
+    rule: dict[str, Any],
+) -> dict[str, Any]:
+    relationships = related_palaces(chart, target)
+    palaces = relationships.get(relation_name, [])
+    required = _normalize_names(rule.get("stars_required", rule.get("stars_all", [])))
+
+    evidence: dict[str, Any] = {
+        "relation": relation_name,
+        "required_stars": sorted(required),
+        "min_count": rule.get("min_count", len(required)),
+        "palaces": [],
+    }
+
+    for palace in palaces:
+        found_names = _scope_star_names([palace])
+        matched = sorted(required & found_names)
+        evidence["palaces"].append({
+            **_palace_label(palace),
+            "matched_stars": matched,
+        })
+
+    evidence["matched_count"] = len(required & _scope_star_names(palaces))
+    return evidence
+
+
+def _evidence_for_condition(chart: dict[str, Any], condition: dict[str, Any]) -> dict[str, Any]:
     target_name = str(condition.get("target", "Mệnh"))
     target = next(
         (
-            p
-            for p in (chart.get("12_cung") or {}).values()
-            if isinstance(p, dict) and (p.get("cung") == target_name or p.get("cung_ten") == target_name)
+            p for p in (chart.get("12_cung") or {}).values()
+            if isinstance(p, dict)
+            and ((p.get("cung") or p.get("cung_ten")) == target_name)
         ),
         None,
     )
     if target is None:
-        return {}
+        return {"target": target_name, "matched": False}
 
-    rels = related_palaces(chart, target)
-    evidence: dict[str, Any] = {"target": target_name}
+    evidence: dict[str, Any] = {
+        "target": target_name,
+        "target_palace": _palace_label(target),
+        "relations": [],
+    }
+
     for relation_name in ("dong_cung", "tam_phuong_tu_chinh", "tam_hop", "xung_chieu", "nhi_hop", "giap_cung"):
         rule = condition.get(relation_name)
-        if not isinstance(rule, dict):
-            continue
-        palaces = rels.get(relation_name, [])
-        required = _normalize_names(rule.get("stars_required", rule.get("stars_all", [])))
-        stars_by_palace = []
-        for palace in palaces:
-            names = _scope_stars([palace])
-            matched = sorted(required & names)
-            if matched:
-                stars_by_palace.append({
-                    "cung_so": palace.get("cung_so"),
-                    "cung": palace.get("cung") or palace.get("cung_ten"),
-                    "dia_chi": palace.get("dia_chi") or palace.get("chi"),
-                    "matched_stars": matched,
-                })
-        if stars_by_palace:
-            evidence[relation_name] = stars_by_palace
+        if isinstance(rule, dict):
+            evidence["relations"].append(_evidence_for_relation(chart, target, relation_name, rule))
+
+    if "giap_cung_pairs" in condition:
+        relationships = related_palaces(chart, target)
+        pair_houses = relationships["giap_cung"]
+        pairs = condition.get("giap_cung_pairs")
+        pair_evidence = []
+        for palace in pair_houses:
+            pair_evidence.append(_palace_label(palace))
+        evidence["giap_cung_pairs"] = {
+            "required_pairs": pairs,
+            "palaces": pair_evidence,
+        }
+
+    for key, house_name in (("cung_quan", "Quan Lộc"), ("cung_tai", "Tài Bạch"), ("cung_dien", "Điền Trạch")):
+        if key in condition:
+            palace = next((p for p in (chart.get("12_cung") or {}).values() if isinstance(p, dict) and (p.get("cung") or p.get("cung_ten")) == house_name), None)
+            evidence[key] = {
+                "palace": _palace_label(palace) if palace else None,
+                "condition": condition[key],
+            }
+
+    for key, chi in (("cung_ty", "Tỵ"), ("cung_dau", "Dậu")):
+        if key in condition:
+            evidence[key] = {"chi": chi, "condition": condition[key]}
+
+    if "luc_hop" in condition:
+        evidence["luc_hop"] = {"condition": condition["luc_hop"]}
+
     return evidence
 
 
-def _match_rule(chart: dict[str, Any], rule: dict[str, Any]) -> list[dict[str, Any]]:
-    conditions = rule.get("conditions")
-    if not isinstance(conditions, dict):
-        return []
+def _matched_branches(chart: dict[str, Any], conditions: dict[str, Any]) -> list[dict[str, Any]]:
     branches = conditions.get("any_of") if isinstance(conditions.get("any_of"), list) else [conditions]
-    matches = []
-    for branch in branches:
-        if isinstance(branch, dict) and evaluate_condition(chart, branch):
-            matches.append(_evidence(chart, branch))
-    return matches
+    result = []
+    for index, branch in enumerate(branches):
+        if not isinstance(branch, dict):
+            continue
+        if evaluate_condition(chart, branch):
+            result.append({
+                "branch_index": index,
+                "condition": branch,
+                "evidence": _evidence_for_condition(chart, branch),
+            })
+    return result
 
 
 def detect_cach_cuc(chart: dict[str, Any]) -> list[dict[str, Any]]:
     matches: list[dict[str, Any]] = []
     for rule in load_cach_cuc():
-        evidence = _match_rule(chart, rule)
-        if not evidence:
+        conditions = rule.get("conditions")
+        if not isinstance(conditions, dict):
+            continue
+        branches = _matched_branches(chart, conditions)
+        if not branches:
             continue
         matches.append({
             "id": rule.get("id"),
@@ -69,8 +134,13 @@ def detect_cach_cuc(chart: dict[str, Any]) -> list[dict[str, Any]]:
             "category": rule.get("category"),
             "description": rule.get("description", ""),
             "reason": rule.get("reason", ""),
-            "conditions": rule.get("conditions", {}),
-            "evidence": evidence,
+            "conditions": conditions,
+            "matched_branches": branches,
+            "interpretation": {
+                "co_ca": rule.get("co_ca", ""),
+                "binh_chu": rule.get("binh_chu", ""),
+                "uu_khuyet_diem": rule.get("uu_khuyet_diem", ""),
+            },
         })
     return matches
 
