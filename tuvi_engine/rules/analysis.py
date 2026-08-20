@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..ai_context import build_ai_context
 from .cach_cuc import detect_cach_cuc
 
 
@@ -28,4 +29,5 @@ def analyze_chart(chart: dict[str, Any]) -> dict[str, Any]:
             "luu_nien": "Rule layer sẵn sàng mở rộng khi bổ sung bảng lưu niên.",
         },
     }
+    result["ai_context"] = build_ai_context(result)
     return result
