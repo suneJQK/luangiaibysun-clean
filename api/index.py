@@ -17,7 +17,6 @@ from tu_vi_calculator import calculate_chart
 from chart_sanitizer import normalize_engine_chart
 from tuvi_engine.data_loader import load_cach_cuc
 from tuvi_engine.rules.analysis import analyze_chart
-from google_sheets_storage import save_user_profile
 
 try:
     from google import genai
@@ -102,6 +101,8 @@ def _prepare_chart(req: BirthRequest) -> dict[str, Any]:
 
 def _save_profile(req: BirthRequest) -> dict[str, Any]:
     try:
+        from google_sheets_storage import save_user_profile
+
         created_at = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
         return save_user_profile(
             user_id=str(uuid.uuid4()),
@@ -139,7 +140,7 @@ def lap_so(req: BirthRequest) -> dict[str, Any]:
     try:
         chart = _prepare_chart(req)
         save_status = _save_profile(req)
-        chart["user_save_status"] = save_status
+        chart.setdefault("storage", {})["user_profile"] = save_status
         return chart
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Không thể lập lá số: {type(exc).__name__}: {exc}") from exc
@@ -172,11 +173,6 @@ def luan_giai(req: AskRequest) -> dict[str, Any]:
             contents=prompt,
             config=config,
         )
-        return {
-            "chart": chart,
-            "calculation": calc,
-            "answer": response.text,
-            "ai_status": "ok",
-        }
+        return {"chart": chart, "calculation": calc, "answer": response.text, "ai_status": "ok"}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Không thể luận giải: {type(exc).__name__}: {exc}") from exc
