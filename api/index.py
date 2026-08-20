@@ -8,6 +8,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from tuvi_lap_so_engine import lap_la_so
@@ -27,6 +28,7 @@ ROOT = Path(__file__).resolve().parent.parent
 BOOKS_FILE = ROOT / "books_cache.json"
 ROOT_PROMPT_FILE = ROOT / "system_prompt_tuvi.txt"
 PROMPT_DIR = ROOT / "system_prompts"
+WEB_INDEX = ROOT / "index.html"
 
 app = FastAPI(title="TV AI - Tử Vi Đẩu Số", version="2.0")
 app.add_middleware(
@@ -96,9 +98,11 @@ def _prepare_chart(req: BirthRequest) -> dict[str, Any]:
     return normalize_engine_chart(analyzed)
 
 
-@app.get("/")
-def root() -> dict[str, Any]:
-    return {"name": "TV AI", "status": "ok", "api": "/api/docs", "version": "2.0"}
+@app.get("/", response_class=FileResponse)
+def root() -> FileResponse:
+    if not WEB_INDEX.exists():
+        raise HTTPException(status_code=500, detail="Thiếu index.html")
+    return FileResponse(WEB_INDEX, media_type="text/html")
 
 
 @app.get("/api/health")
