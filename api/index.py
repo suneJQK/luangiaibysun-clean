@@ -28,7 +28,7 @@ WEB_INDEX = ROOT / "index.html"
 AI_MODE_INDEX = ROOT / "ai_mode.html"
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
-app = FastAPI(title="TV AI - Tử Vi Đẩu Số", version="2.7")
+app = FastAPI(title="TV AI - Tử Vi Đẩu Số", version="2.8")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -143,6 +143,35 @@ def _save_profile(req: BirthRequest) -> dict[str, Any]:
         return {"saved": False, "error": f"{type(exc).__name__}: {exc}"}
 
 
+def _assert_ai_payload_sync(calc: dict[str, Any], ai_context: dict[str, Any]) -> None:
+    """Fail closed if AI context and calculated vận layers disagree."""
+    van = calc.get("van") or {}
+    authoritative = van.get("tieu_van") or {}
+    synced = (van.get("sync_contract") or {}).get("tieu_van_cung_so")
+    if synced != authoritative.get("cung_so"):
+        raise ValueError("Dữ liệu Tiểu vận nội bộ không đồng bộ")
+
+    context_van = ai_context.get("van_han") or {}
+    context_tieu = context_van.get("tieu_van") or {}
+    if context_tieu != authoritative:
+        raise ValueError("AI context và Tiểu vận authoritative không đồng bộ")
+
+    palaces = ai_context.get("palaces") or {}
+    palace_items = palaces.values() if isinstance(palaces, dict) else palaces
+    forbidden = {"dai_van", "tieu_van", "luu_nien", "luu_dai_van", "luu_nguyet", "luu_nhat", "luu_thoi"}
+    for palace in palace_items:
+        if isinstance(palace, dict) and forbidden.intersection(palace):
+            raise ValueError("AI context còn chứa dynamic vận tĩnh trong từng cung")
+
+
+def _ai_context_for_request(chart: dict[str, Any], calc: dict[str, Any]) -> dict[str, Any]:
+    context = chart.get("ai_context")
+    if not isinstance(context, dict):
+        raise ValueError("Thiếu AI context authoritative")
+    _assert_ai_payload_sync(calc, context)
+    return context
+
+
 @app.get("/", response_class=FileResponse)
 def root() -> FileResponse:
     if not WEB_INDEX.exists():
@@ -159,7 +188,7 @@ def ai_mode_page() -> FileResponse:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"status": "ok", "service": "tv-ai", "version": "2.7"}
+    return {"status": "ok", "service": "tv-ai", "version": "2.8"}
 
 
 @app.get("/api/ai-modes")
@@ -227,13 +256,16 @@ def luan_giai(req: AskRequest, request: Request) -> dict[str, Any]:
             hour=req.gio_xem,
         )
         chart["van"] = calc.get("van", {})
-        ai_context = chart.get("ai_context", {})
+        ai_context = _ai_context_for_request(chart, calc)
         cach_cuc_analysis = chart.get("cach_cuc_analysis", {})
         books = _load_json(BOOKS_FILE, {})
         mode_text, mode_id = _load_ai_mode(request.cookies.get("tv_ai_mode", "standard"))
         provider_id = normalize_provider(req.provider or request.cookies.get("tv_ai_provider", "gemini"))
         reasoning = calc.get("van", {}).get("reasoning_context", {})
-        prompt = f'''Năm luận: {target_year or date.today().year}\n\nCHẾ ĐỘ LUẬN GIẢI ĐƯỢC CHỌN:\n{mode_text}\n\nCÂU HỎI:\n{req.question}\n\nDỮ LIỆU LÁ SỐ:\n{_compact(chart)}\n\nCÁC LỚP VẬN:\n{_compact(calc.get("van", {}), 30000)}\n\nCÂY SUY LUẬN VẬN HẠN:\n{_compact(reasoning, 35000)}\n\nBẰNG CHỨNG CÁCH CỤC:\n{_compact(cach_cuc_analysis, 30000)}\n\nQUAN HỆ CUNG:\n{_compact(ai_context.get("relationship_knowledge", {}), 20000)}\n\nCONTEXT AI:\n{_compact(ai_context, 50000)}\n\nTÍNH TOÁN KHÁC:\n{_compact(calc, 30000)}\n\nTÀI LIỆU:\n{_compact(books, 40000)}\n\nQUY TẮC BẮT BUỘC:\n- Phải luận theo workflow trong CÂY SUY LUẬN VẬN HẠN, không bỏ qua Đại vận để nhảy thẳng sang Lưu niên/tháng.\n- Phân biệt rõ: Nguyên cục là nền; Đại vận là nền dài hạn; Lưu niên/Tiểu vận là kích hoạt năm; Lưu nguyệt/Lưu nhật/Lưu thời chỉ là lớp kích hoạt vi mô.\n- Đọc Đồng cung trước, sau đó Tam Hợp + Xung Chiếu, rồi Nhị Hợp + Giáp Cung và Tuần/Triệt.\n- Không gọi Giáp Cung là Nhị Hợp. Không gọi Xung Chiếu là Tam Hợp.\n- Một sự kiện mạnh phải có nhiều lớp cùng quy tụ; không kết luận chắc chắn từ một sao, một sát tinh hoặc một quan hệ đơn lẻ.\n- Chỉ dùng Cách Cục đã match từ engine.\n- Lưu nguyệt phải ưu tiên Tiết khí; không đồng nhất tháng âm lịch với tháng Tiết khí.\n- Không tự an sao, không tự thêm hoặc sửa dữ liệu engine.\n- Nếu thiếu ngày/tháng/giờ xem, không bịa Lưu nhật/Lưu thời; chỉ luận tới tầng dữ liệu thực có.'''
+
+        # Chỉ gửi AI dữ liệu nguồn đã đồng bộ. Không gửi `chart` thô vì nó có
+        # thể chứa các trường dynamic vận tĩnh ở từng cung từ engine cũ.
+        prompt = f'''Năm luận: {target_year or date.today().year}\n\nCHẾ ĐỘ LUẬN GIẢI ĐƯỢC CHỌN:\n{mode_text}\n\nCÂU HỎI:\n{req.question}\n\nCONTEXT AI CHÍNH THỨC:\n{_compact(ai_context, 70000)}\n\nCÁC LỚP VẬN ĐÃ TÍNH:\n{_compact(calc.get("van", {}), 35000)}\n\nCÂY SUY LUẬN VẬN HẠN:\n{_compact(reasoning, 35000)}\n\nBẰNG CHỨNG CÁCH CỤC:\n{_compact(cach_cuc_analysis, 30000)}\n\nQUAN HỆ CUNG:\n{_compact(ai_context.get("relationship_knowledge", {}), 20000)}\n\nTÀI LIỆU:\n{_compact(books, 40000)}\n\nQUY TẮC BẮT BUỘC:\n- Chỉ dùng CONTEXT AI CHÍNH THỨC và CÁC LỚP VẬN ĐÃ TÍNH làm nguồn sự kiện; không suy ngược Tiểu vận từ từng cung của lá số.\n- Phải luận theo workflow trong CÂY SUY LUẬN VẬN HẠN, không bỏ qua Đại vận để nhảy thẳng sang Lưu niên/tháng.\n- Phân biệt rõ: Nguyên cục là nền; Đại vận là nền dài hạn; Lưu niên/Tiểu vận là kích hoạt năm; Lưu nguyệt/Lưu nhật/Lưu thời chỉ là lớp kích hoạt vi mô.\n- Đọc Đồng cung trước, sau đó Tam Hợp + Xung Chiếu, rồi Nhị Hợp + Giáp Cung và Tuần/Triệt.\n- Không gọi Giáp Cung là Nhị Hợp. Không gọi Xung Chiếu là Tam Hợp.\n- Một sự kiện mạnh phải có nhiều lớp cùng quy tụ; không kết luận chắc chắn từ một sao, một sát tinh hoặc một quan hệ đơn lẻ.\n- Chỉ dùng Cách Cục đã match từ engine.\n- Lưu nguyệt phải ưu tiên Tiết khí; không đồng nhất tháng âm lịch với tháng Tiết khí.\n- Không tự an sao, không tự thêm hoặc sửa dữ liệu engine.\n- Nếu thiếu ngày/tháng/giờ xem, không bịa Lưu nhật/Lưu thời; chỉ luận tới tầng dữ liệu thực có.'''
         answer, selected_provider = generate_ai(
             provider=provider_id,
             system_instruction=_system_prompt() + "\nAI chỉ diễn giải dữ liệu từ engine Python local.",
