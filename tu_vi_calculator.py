@@ -58,16 +58,25 @@ def _branch_number(value: Any) -> int | None:
         return None
 
 
-def _palace_by_branch(chart: dict[str, Any], branch_name: str) -> dict[str, Any] | None:
-    """Tra cung chức năng thực tế của lá số theo Địa Chi cung Tiểu vận."""
+def _palace_by_number(chart: dict[str, Any], palace_number: Any) -> dict[str, Any] | None:
+    """Tra đúng ô cung của lá số theo cung số canonical 1..12."""
+    try:
+        number = int(palace_number)
+    except (TypeError, ValueError):
+        return None
     for palace in (chart.get("12_cung") or {}).values():
-        if isinstance(palace, dict) and palace.get("dia_chi") == branch_name:
+        if isinstance(palace, dict) and palace.get("cung_so") == number:
             return palace
     return None
 
 
 def _sync_tieu_van(chart: dict[str, Any], van: dict[str, Any]) -> None:
-    """Tính Tiểu vận động và tra sang đúng cung của từng lá số."""
+    """Tính Tiểu vận động và tra sang đúng cung của từng lá số.
+
+    Quy tắc Tiểu vận trả về ``cung_so`` theo bàn 12 vị trí. Không tra ngược
+    một lần nữa bằng tên Địa Chi, vì làm vậy sẽ tạo double-mapping và có thể
+    gây lỗi khi schema/engine biểu diễn Địa Chi khác nhau.
+    """
     thien_ban = chart.get("thien_ban", {}) if isinstance(chart, dict) else {}
     inp = chart.get("input", {}) if isinstance(chart, dict) else {}
     birth_branch = _branch_number(thien_ban.get("chi_nam"))
@@ -86,15 +95,17 @@ def _sync_tieu_van(chart: dict[str, Any], van: dict[str, Any]) -> None:
         age=int(age) if age is not None else None,
     )
 
-    target_branch_name = canonical.get("cung_dia_chi_ten")
-    target_palace = _palace_by_branch(chart, str(target_branch_name)) if target_branch_name else None
+    # canonical.cung_so chính là vị trí 1..12 được xác định bởi quy tắc
+    # khởi cung + tuổi + chiều. Tra theo cung_so của chính lá số.
+    target_palace = _palace_by_number(chart, canonical.get("cung_so"))
     if target_palace is None:
-        raise ValueError(f"Không tìm thấy cung có Địa Chi {target_branch_name!r} trong 12 cung lá số")
+        raise ValueError(
+            f"Không tìm thấy cung số {canonical.get('cung_so')!r} trong 12 cung lá số"
+        )
 
-    # Giữ số cung từ lá số thật; không suy ra tên cung bằng một số hard-code.
     canonical["cung_so"] = target_palace.get("cung_so")
     canonical["cung"] = target_palace.get("cung")
-    canonical["dia_chi"] = target_palace.get("dia_chi")
+    canonical["dia_chi"] = target_palace.get("dia_chi") or canonical.get("cung_dia_chi_ten")
     canonical["can_chi"] = target_palace.get("can_chi")
     canonical["cung_chuc_nang"] = target_palace.get("cung")
     van["tieu_van"] = canonical
@@ -104,7 +115,7 @@ def _dynamic_sync_contract(van: dict[str, Any]) -> dict[str, Any]:
     tieu = van.get("tieu_van") or {}
     year = van.get("year") or {}
     return {
-        "source_of_truth": "calculate_van_layers -> dynamic_tieu_van_rule -> chart.palace_by_branch",
+        "source_of_truth": "calculate_van_layers -> dynamic_tieu_van_rule -> chart.palace_by_cung_so",
         "year": year.get("nam"),
         "year_chi": year.get("chi_ten"),
         "tieu_van_cung_so": tieu.get("cung_so"),
@@ -156,7 +167,7 @@ def calculate_chart(
     chart["ai_context"] = build_ai_context(chart, van=deepcopy(van))
 
     return {
-        "calculator_version": "3.4",
+        "calculator_version": "3.5",
         "relations": relations,
         "van": van,
     }
