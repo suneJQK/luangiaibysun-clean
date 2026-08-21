@@ -1,14 +1,19 @@
-"""Tính các lớp vận theo bộ quy tắc đã đối chiếu từ nguồn tham khảo.
+"""Bộ tính vận hạn theo logic nguồn tham khảo đã cung cấp.
 
-Phạm vi module:
-- Đại vận Tử Vi: đọc trực tiếp tuổi bắt đầu Đại vận đã được engine an vào 12 cung.
-- Tiểu vận: port quy tắc ánh xạ năm Chi -> cung theo mẫu mã nguồn tham khảo.
-- Lưu niên: cung có Địa Chi của năm xem.
-- Lưu nguyệt: dùng tháng Tiết khí, không lấy tháng âm lịch thuần túy.
-- Lưu nhật/Lưu thời: Can Chi ngày/giờ theo Julian Day.
-- Tứ Trụ: bốn trụ và tuổi nhập vận theo khoảng cách đến tiết khí.
+Phân tầng:
+    Lá số gốc -> Đại vận -> Lưu Đại vận -> Lưu niên/Tiểu vận
+    -> Lưu nguyệt (Tiết khí) -> Lưu nhật -> Lưu thời.
 
-Không thay đổi giới hạn năm 1800-2200 của API/engine.
+Quan trọng:
+- Đại vận Tử Vi dùng Cục + chiều Âm/Dương nam nữ + cung Đại vận của engine.
+- Tiểu vận dùng ánh xạ Chi năm sinh -> 12 cung theo đúng đoạn nguồn.
+- Lưu niên trong Đại vận dùng hàm lndv() của nguồn.
+- Lưu nguyệt dùng Tiết khí/Solar Longitude, không lấy tháng âm lịch thuần túy.
+- Lưu nhật dùng Julian Day để tính Can Chi ngày.
+- Lưu thời dùng Can ngày + Chi giờ.
+- Đại vận Tứ Trụ dùng khoảng cách đến tiết khí trước/sau, chia 3 theo tài liệu.
+
+Giới hạn năm 1800-2200 được giữ nguyên ở API/engine hiện hữu.
 """
 from __future__ import annotations
 
@@ -17,7 +22,6 @@ from typing import Any
 
 CAN_NAMES = ["", "Giáp", "Ất", "Bính", "Đinh", "Mậu", "Kỷ", "Canh", "Tân", "Nhâm", "Quý"]
 CHI_NAMES = ["", "Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi", "Thân", "Dậu", "Tuất", "Hợi"]
-CHI_ID = {name: idx for idx, name in enumerate(CHI_NAMES) if name}
 
 
 def check(value: int) -> int:
@@ -36,6 +40,10 @@ def chi_name(value: int) -> str:
     return CHI_NAMES[check(value)]
 
 
+def _is_male(gender: str) -> bool:
+    return str(gender).strip().casefold() in {"nam", "male", "m", "1"}
+
+
 def _jd_from_date(day: int, month: int, year: int) -> int:
     a = (14 - month) // 12
     y = year + 4800 - a
@@ -43,7 +51,25 @@ def _jd_from_date(day: int, month: int, year: int) -> int:
     return day + ((153 * m + 2) // 5) + 365 * y + y // 4 - y // 100 + y // 400 - 32045
 
 
+def _jd_to_gregorian(jd: int) -> tuple[int, int, int]:
+    if jd > 2299160:
+        a = jd + 32044
+        b = (4 * a + 3) // 146097
+        c = a - (b * 146097) // 4
+    else:
+        b = 0
+        c = jd + 32082
+    d = (4 * c + 3) // 1461
+    e = c - (1461 * d) // 4
+    m = (5 * e + 2) // 153
+    day = e - (153 * m + 2) // 5 + 1
+    month = m + 3 - 12 * (m // 10)
+    year = b * 100 + d - 4800 + m // 10
+    return day, month, year
+
+
 def _solar_longitude(jd: float) -> float:
+    """Đúng công thức solarLongitude() trong tài liệu."""
     T = (jd - 2451545.0) / 36525.0
     T2 = T * T
     dr = math.pi / 180.0
@@ -59,18 +85,13 @@ def _solar_longitude(jd: float) -> float:
 
 
 def tiet_khi_month(day: int, month: int, year: int, time_zone: float = 7.0) -> int:
-    """Trả tháng tiết khí 1..12 theo Solar Longitude của nguồn tham khảo.
-
-    API V2 hiện không nhận phút sinh/xem, nên lấy 00:00 địa phương của ngày.
-    Gần đúng thời điểm đổi tiết khí có thể cần thêm giờ/phút để đạt độ chính xác tuyệt đối.
-    """
+    """Tháng Tiết khí 1..12 theo solarLongitude() + offset 315 độ của nguồn."""
     jd = _jd_from_date(day, month, year)
-    local_midnight_jd = jd - 0.5 - float(time_zone) / 24.0
-    solar_longitude = _solar_longitude(local_midnight_jd)
-    shifted = solar_longitude - 315.0
-    if shifted < 30.0:
-        shifted += 360.0
-    return check(int(shifted // 30.0) + 1)
+    local_midnight = jd - 0.5 - float(time_zone) / 24.0
+    sl = _solar_longitude(local_midnight) - 315.0
+    if sl < 30.0:
+        sl += 360.0
+    return check(int(sl // 30.0) + 1)
 
 
 def can_chi_year(year: int) -> tuple[int, int]:
@@ -109,183 +130,228 @@ def _birth_year_branch(chart: dict[str, Any]) -> int | None:
     return None
 
 
-def _direction_from_year_can(can_year: int | None, gender: str) -> int:
+def _dv_direction(can_year: int | None, gender: str) -> int:
+    """Nl trong nguồn: Dương Nam/Âm Nữ thuận; Âm Nam/Dương Nữ nghịch."""
     if can_year is None:
         return 1
-    yang = check_can(can_year) % 2 == 1
-    male = str(gender).strip().casefold() in {"nam", "male", "m", "1"}
-    return 1 if yang == male else -1
+    can_yang = check_can(can_year) % 2 == 1
+    return 1 if can_yang == _is_male(gender) else -1
 
 
-def _find_palace_by_branch(chart: dict[str, Any], branch: int) -> int | None:
+def _palace_by_branch(chart: dict[str, Any], branch: int) -> int | None:
     target = chi_name(branch)
     for palace in chart.get("12_cung", {}).values():
         if palace.get("dia_chi") == target:
-            return palace.get("cung_so")
+            value = palace.get("cung_so")
+            if isinstance(value, int):
+                return value
     return None
 
 
-def _tieu_van_palace(birth_branch: int, target_branch: int, gender: str) -> int | None:
-    """Port ánh xạ Tiểu vận trong đoạn mã tham khảo được cung cấp."""
-    if birth_branch in (1, 5, 9):
-        start = 11
-    elif birth_branch in (2, 6, 10):
-        start = 8
-    elif birth_branch in (3, 7, 11):
-        start = 5
-    else:
-        start = 2
-
-    forward = str(gender).strip().casefold() in {"nam", "male", "m", "1"}
-    direction = 1 if forward else -1
-    palace = check(start + 10)
-    for offset in range(12):
-        mapped_branch = check(birth_branch + offset * direction)
-        if mapped_branch == target_branch:
-            return palace
-        palace = check(palace + 1)
-    return None
-
-
-def _dai_van_layers(chart: dict[str, Any], target_year: int | None) -> dict[str, Any]:
-    input_data = chart.get("input", {})
-    birth_year = int(input_data.get("nam"))
-    gender = str(input_data.get("gioi_tinh", "Nam"))
-    age = None if target_year is None else int(target_year) - birth_year + 1
-
+def _engine_dai_van_items(chart: dict[str, Any]) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     for palace in chart.get("12_cung", {}).values():
-        start = palace.get("dai_van", {}).get("tuoi_bat_dau")
+        dv = palace.get("dai_van") or {}
+        start = dv.get("tuoi_bat_dau")
         try:
-            start_int = int(start)
+            start_i = int(start)
         except (TypeError, ValueError):
             continue
         items.append({
             "cung_so": palace.get("cung_so"),
             "cung": palace.get("cung"),
             "dia_chi": palace.get("dia_chi"),
-            "tuoi_bat_dau": start_int,
-            "tuoi_ket_thuc": start_int + 9,
-            "can_chi": palace.get("can_chi"),
+            "tuoi_bat_dau": start_i,
+            "tuoi_ket_thuc": start_i + 9,
+            "can_chi_engine": palace.get("can_chi"),
         })
     items.sort(key=lambda x: (x["tuoi_bat_dau"], x.get("cung_so") or 99))
-    current = None
-    if age is not None:
-        current = next((item for item in items if item["tuoi_bat_dau"] <= age <= item["tuoi_ket_thuc"]), None)
+    return items
+
+
+def _tuoi_xem(birth_year: int, target_year: int) -> int:
+    return target_year - birth_year + 1
+
+
+def _current_dai_van(chart: dict[str, Any], target_year: int) -> dict[str, Any] | None:
+    input_data = chart.get("input", {})
+    birth_year = int(input_data["nam"])
+    age = _tuoi_xem(birth_year, target_year)
+    items = _engine_dai_van_items(chart)
+    current = next((x for x in items if x["tuoi_bat_dau"] <= age <= x["tuoi_ket_thuc"]), None)
+    if current is None:
+        return None
+
+    can_year = _birth_year_can(chart)
+    gender = str(input_data.get("gioi_tinh", "Nam"))
+    direction = _dv_direction(can_year, gender)
+    cung = int(current["cung_so"])
+    fl = check(cung - 2)
+    yl = check_can(2 * (can_year or 1) + 1)
+    dv_can = check_can(fl + yl - 1)
+    dv_branch = check(cung + 10)
 
     return {
+        **current,
         "tuoi_xem": age,
-        "huong": "thuận" if _direction_from_year_can(_birth_year_can(chart), gender) == 1 else "nghịch",
-        "cac_dai_van": items,
-        "dang_xet": current,
+        "huong": "thuận" if direction == 1 else "nghịch",
+        "can": dv_can,
+        "can_ten": can_name(dv_can),
+        "chi": dv_branch,
+        "chi_ten": chi_name(dv_branch),
+        "cung_so": cung,
+        "source_formula": {"Fl": fl, "yl": yl, "can_dai_van": "checkcan(Fl + yl - 1)"},
     }
 
 
-def _tiet_khi_distance_days(day: int, month: int, year: int, direction: int, time_zone: float) -> int:
-    """Port logic jdsau/jdtruoc từ mã nguồn: tìm ngày đổi tháng tiết khí gần ngày sinh."""
-    jd0 = _jd_from_date(day, month, year)
-    current = tiet_khi_month(day, month, year, time_zone)
-    if direction > 0:
-        delta = 0
-        while delta < 370:
-            probe = jd0 + delta
-            # Đổi Julian day về xấp xỉ ngày Dương lịch chỉ với phép ngược đủ cho khoảng 1 năm.
-            # Dùng hiệu trực tiếp trên JDN bằng cách thử quanh ngày sinh.
-            if delta == 0:
-                delta += 1
-                continue
-            if _tiet_khi_month_from_jd(probe, time_zone) != current:
-                return delta
-            delta += 1
-        return 0
-
-    delta = 0
-    while delta < 370:
-        if delta == 0:
-            delta += 1
-            continue
-        probe = jd0 - delta
-        if _tiet_khi_month_from_jd(probe, time_zone) != current:
-            return delta
-        delta += 1
-    return 0
+def _source_lndv(tuoi: int, cung_dai_van: int, bat_dau: int, step: int) -> int | None:
+    """Port nguyên hàm lndv(tuoi,chicungdaivan,bddaivan,step) từ nguồn."""
+    khoi = tuoi - bat_dau
+    x = cung_dai_van
+    if khoi == 0:
+        return x
+    if khoi == 1:
+        return check(x + 6)
+    if khoi == 2:
+        return check(x + 6 - step)
+    if khoi == 3:
+        return check(x + 6)
+    if khoi == 4:
+        return check(x + 6 + step)
+    if khoi == 5:
+        return check(x + 6 + 2 * step)
+    if khoi == 6:
+        return check(x + 6 + 3 * step)
+    if khoi == 7:
+        return check(x + 6 + 4 * step)
+    if khoi == 8:
+        return check(x + 6 + 5 * step)
+    if khoi == 9:
+        return check(x + 6 + 6 * step)
+    return None
 
 
-def _jd_to_gregorian(jd: int) -> tuple[int, int, int]:
-    a = jd + 32044
-    b = (4 * a + 3) // 146097
-    c = a - (b * 146097) // 4
-    d = (4 * c + 3) // 1461
-    e = c - (1461 * d) // 4
-    m = (5 * e + 2) // 153
-    day = e - (153 * m + 2) // 5 + 1
-    month = m + 3 - 12 * (m // 10)
-    year = b * 100 + d - 4800 + m // 10
-    return day, month, year
+def _tieu_van_source_mapping(birth_branch: int, target_branch: int, gender: str) -> dict[str, Any]:
+    """Port block chitieuvan[] của nguồn."""
+    if birth_branch in (1, 5, 9):
+        i = 11
+    elif birth_branch in (2, 6, 10):
+        i = 8
+    elif birth_branch in (3, 7, 11):
+        i = 5
+    else:
+        i = 2
+
+    direction = 1 if _is_male(gender) else -1
+    palace = check(i + 10)
+    sequence: list[dict[str, int]] = []
+    for offset in range(12):
+        mapped_branch = check(birth_branch + offset * direction)
+        sequence.append({"cung_so": palace, "chi": mapped_branch, "thu_tu": offset + 1})
+        palace = check(palace + 1)
+
+    selected = next((x for x in sequence if x["chi"] == target_branch), None)
+    return {
+        "cung_so": selected["cung_so"] if selected else None,
+        "chi_nam": target_branch,
+        "chi_ten": chi_name(target_branch),
+        "huong": "thuận" if direction == 1 else "nghịch",
+        "cung_khoi": check(i + 10),
+        "sequence": sequence,
+    }
 
 
-def _tiet_khi_month_from_jd(jd: int, time_zone: float) -> int:
+def _source_luu_dai_van_can(dv_can: int, cung_dv: int) -> list[dict[str, Any]]:
+    """Tạo Can của 12 cung Lưu Đại vận theo ctieuvan[] nguồn."""
+    i = check_can(2 * dv_can + 1)
+    out = []
+    for offset in range(12):
+        cung = check(cung_dv + offset)
+        can = check_can((offset + 1) + i - 1)
+        out.append({"cung_so": cung, "can": can, "can_ten": can_name(can)})
+    return out
+
+
+def _tiet_khi_day_from_jd(jd: int, time_zone: float) -> int:
     day, month, year = _jd_to_gregorian(jd)
     return tiet_khi_month(day, month, year, time_zone)
 
 
-def _tu_tru_for_date(day: int, month: int, year: int, hour: int | None, time_zone: float) -> dict[str, Any]:
+def _days_to_tiet_khi(day: int, month: int, year: int, direction: int, time_zone: float) -> int:
+    jd0 = _jd_from_date(day, month, year)
+    current = _tiet_khi_day_from_jd(jd0, time_zone)
+    for delta in range(1, 371):
+        probe = jd0 + delta * direction
+        if _tiet_khi_day_from_jd(probe, time_zone) != current:
+            return delta
+    return 0
+
+
+def _tu_tru_for_date(day: int, month: int, year: int, hour_branch: int | None, time_zone: float) -> dict[str, Any]:
     year_can, year_branch = can_chi_year(year)
-    tk_branch = tiet_khi_month(day, month, year, time_zone)
-    month_can = check_can(2 * year_can + tk_branch)
-    month_branch = check(tk_branch + 2)
+    tk = tiet_khi_month(day, month, year, time_zone)
+    month_can = check_can(2 * year_can + tk)
+    month_branch = check(tk + 2)
     day_can, day_branch = can_chi_day(day, month, year)
-    out: dict[str, Any] = {
+    result = {
         "nam": {"can": year_can, "can_ten": can_name(year_can), "chi": year_branch, "chi_ten": chi_name(year_branch)},
-        "thang": {"can": month_can, "can_ten": can_name(month_can), "chi": month_branch, "chi_ten": chi_name(month_branch), "thang_tiet_khi": tk_branch},
+        "thang": {"can": month_can, "can_ten": can_name(month_can), "chi": month_branch, "chi_ten": chi_name(month_branch), "thang_tiet_khi": tk},
         "ngay": {"can": day_can, "can_ten": can_name(day_can), "chi": day_branch, "chi_ten": chi_name(day_branch)},
     }
-    if hour is not None:
-        hour_can, hour_branch = can_chi_hour(day_can, hour)
-        out["gio"] = {"can": hour_can, "can_ten": can_name(hour_can), "chi": hour_branch, "chi_ten": chi_name(hour_branch)}
-    return out
+    if hour_branch is not None:
+        hour_can, hour_chi = can_chi_hour(day_can, hour_branch)
+        result["gio"] = {"can": hour_can, "can_ten": can_name(hour_can), "chi": hour_chi, "chi_ten": chi_name(hour_chi)}
+    return result
 
 
 def _tu_tru_dai_van(chart: dict[str, Any], time_zone: float) -> dict[str, Any]:
-    input_data = chart.get("input", {})
-    birth_day = int(input_data["ngay"])
-    birth_month = int(input_data["thang"])
-    birth_year = int(input_data["nam"])
-    gender = str(input_data.get("gioi_tinh", "Nam"))
-    birth_hour = int(input_data.get("gio_sinh", 1))
+    inp = chart.get("input", {})
+    day, month, year = int(inp["ngay"]), int(inp["thang"]), int(inp["nam"])
+    gender = str(inp.get("gioi_tinh", "Nam"))
+    hour = inp.get("gio_sinh")
+    hour_branch = int(hour) if str(hour).isdigit() else None
+    birth = _tu_tru_for_date(day, month, year, hour_branch, time_zone)
+    month_can = birth["thang"]["can"]
+    month_chi = birth["thang"]["chi"]
+    direction = 1 if _is_male(gender) else -1
+    distance = _days_to_tiet_khi(day, month, year, direction, time_zone)
+    age_start = (distance + 1) // 3
+    if age_start < 1:
+        age_start = 1
 
-    birth_pillars = _tu_tru_for_date(birth_day, birth_month, birth_year, birth_hour, time_zone)
-    month_can = birth_pillars["thang"]["can"]
-    month_branch = birth_pillars["thang"]["chi"]
-
-    # Port quy tắc nguồn: nam dùng số ngày tới tiết kế, nữ dùng số ngày tới tiết trước; chia 3 để ra tuổi nhập vận.
-    forward = str(gender).strip().casefold() in {"nam", "male", "m", "1"}
-    direction = 1 if forward else -1
-    distance_days = _tiet_khi_distance_days(birth_day, birth_month, birth_year, direction, time_zone)
-    start_age = int((distance_days + 1) // 3)
-    if start_age < 1:
-        start_age = 1
-
-    items = []
+    dvs = []
     for idx in range(8):
         step = idx * direction
-        items.append({
+        can = check_can(month_can + step)
+        chi = check(month_chi + step)
+        dvs.append({
             "thu_tu": idx + 1,
-            "tuoi_bat_dau": start_age + idx * 10,
-            "tuoi_ket_thuc": start_age + idx * 10 + 9,
-            "can": check_can(month_can + step),
-            "can_ten": can_name(month_can + step),
-            "chi": check(month_branch + step),
-            "chi_ten": chi_name(month_branch + step),
+            "tuoi_bat_dau": age_start + idx * 10,
+            "tuoi_ket_thuc": age_start + idx * 10 + 9,
+            "can": can,
+            "can_ten": can_name(can),
+            "chi": chi,
+            "chi_ten": chi_name(chi),
         })
 
     return {
-        "bon_tru_sinh": birth_pillars,
-        "tuoi_nhap_van": start_age,
+        "bon_tru_sinh": birth,
+        "tuoi_nhap_van": age_start,
         "huong": "thuận" if direction == 1 else "nghịch",
-        "dai_van": items,
-        "ghi_chu": "Tuổi nhập vận được tính theo khoảng cách đến tiết khí theo mã nguồn tham khảo; với API hiện chỉ có giờ địa chi, không có phút sinh.",
+        "khoang_cach_tiet_khi_ngay": distance,
+        "dai_van": dvs,
+        "phuong_phap_nguon": "distance_to_tiet_khi / 3",
     }
+
+
+def _resolve_target_date(month: int | None, day: int | None) -> tuple[int | None, int | None]:
+    if month is None:
+        return None, None
+    if not 1 <= month <= 12:
+        raise ValueError("thang_xem phải nằm trong 1..12")
+    if day is not None and not 1 <= day <= 31:
+        raise ValueError("ngay_xem phải nằm trong 1..31")
+    return month, day
 
 
 def calculate_van_layers(
@@ -297,62 +363,84 @@ def calculate_van_layers(
     hour: int | None = None,
     time_zone: float | None = None,
 ) -> dict[str, Any]:
-    input_data = chart.get("input", {})
-    birth_year = int(input_data.get("nam"))
-    birth_day = int(input_data.get("ngay"))
-    birth_month = int(input_data.get("thang"))
-    birth_hour = int(input_data.get("gio_sinh"))
+    inp = chart.get("input", {})
+    birth_year = int(inp["nam"])
+    birth_day = int(inp["ngay"])
+    birth_month = int(inp["thang"])
+    birth_hour = int(inp.get("gio_sinh")) if str(inp.get("gio_sinh", "")).isdigit() else None
+    gender = str(inp.get("gioi_tinh", "Nam"))
+    tz = float(inp.get("time_zone", 7.0) if time_zone is None else time_zone)
     target_year = birth_year if year is None else int(year)
-    tz = float(input_data.get("time_zone", 7.0) if time_zone is None else time_zone)
-    gender = str(input_data.get("gioi_tinh", "Nam"))
 
-    year_can, year_branch = can_chi_year(target_year)
+    target_year_can, target_year_branch = can_chi_year(target_year)
+    birth_can = _birth_year_can(chart)
     birth_branch = _birth_year_branch(chart)
-    tieu_cung = _tieu_van_palace(birth_branch or 1, year_branch, gender) if birth_branch else None
+    direction = _dv_direction(birth_can, gender)
+    age = _tuoi_xem(birth_year, target_year)
+    dv = _current_dai_van(chart, target_year)
+
+    tieu_van = _tieu_van_source_mapping(birth_branch, target_year_branch, gender) if birth_branch is not None else None
+
+    luu_nien_dv = None
+    if dv is not None:
+        luu_nien_dv = _source_lndv(age, int(dv["cung_so"]), int(dv["tuoi_bat_dau"]), direction)
+
+    luu_dai_van = None
+    if dv is not None:
+        luu_dai_van = {
+            "cung_dai_van": dv["cung_so"],
+            "can_dai_van": dv["can"],
+            "can_dai_van_ten": dv["can_ten"],
+            "chi_dai_van": dv["chi"],
+            "chi_dai_van_ten": dv["chi_ten"],
+            "can_12_cung": _source_luu_dai_van_can(int(dv["can"]), int(dv["cung_so"])),
+        }
 
     result: dict[str, Any] = {
+        "algorithm_version": "source-v3.0",
+        "age": age,
         "year": {
             "nam": target_year,
-            "can": year_can,
-            "can_ten": can_name(year_can),
-            "chi": year_branch,
-            "chi_ten": chi_name(year_branch),
-            "cung_luu_nien": _find_palace_by_branch(chart, year_branch),
+            "can": target_year_can,
+            "can_ten": can_name(target_year_can),
+            "chi": target_year_branch,
+            "chi_ten": chi_name(target_year_branch),
+            "cung_luu_nien": _palace_by_branch(chart, target_year_branch),
         },
-        "dai_van": _dai_van_layers(chart, target_year),
-        "tieu_van": {
-            "cung_so": tieu_cung,
-            "chi_nam": year_branch,
-            "chi_ten": chi_name(year_branch),
-            "phuong_phap": "ánh xạ Tiểu vận theo mã nguồn tham khảo",
+        "dai_van": {"huong": "thuận" if direction == 1 else "nghịch", "dang_xet": dv, "cac_dai_van": _engine_dai_van_items(chart)},
+        "luu_dai_van": luu_dai_van,
+        "tieu_van": tieu_van,
+        "luu_nien": {
+            "cung_nam": _palace_by_branch(chart, target_year_branch),
+            "chi_nam": target_year_branch,
+            "chi_nam_ten": chi_name(target_year_branch),
+            "cung_luu_nien_trong_dai_van": luu_nien_dv,
+            "phuong_phap": "Chi năm xem + lndv() trong Đại vận hiện hành",
         },
         "tu_tru": _tu_tru_dai_van(chart, tz),
         "tu_tru_sinh": _tu_tru_for_date(birth_day, birth_month, birth_year, birth_hour, tz),
     }
 
-    if month is not None:
-        month_int = int(month)
-        if not 1 <= month_int <= 12:
-            raise ValueError("thang_xem phải nằm trong 1..12")
-        month_branch_base = tiet_khi_month(1, month_int, target_year, tz)
-        month_can = check_can(2 * year_can + month_branch_base)
-        month_branch = check(month_branch_base + 2)
+    month_int, day_int = _resolve_target_date(month, day)
+    if month_int is not None:
+        tk = tiet_khi_month(day_int or 1, month_int, target_year, tz)
+        month_can = check_can(2 * target_year_can + tk)
+        month_branch = check(tk + 2)
         result["luu_nguyet"] = {
             "thang_duong": month_int,
-            "thang_tiet_khi": month_branch_base,
-            "can_thang": month_can,
-            "can_thang_ten": can_name(month_can),
-            "chi_thang": month_branch,
-            "chi_thang_ten": chi_name(month_branch),
-            "cung_so": _find_palace_by_branch(chart, month_branch),
-            "ghi_chu": "Tháng vận dùng Tiết khí, không đồng nhất với tháng âm lịch; ngày sát mốc tiết khí cần giờ/phút chính xác để phân định tuyệt đối.",
+            "ngay_moc_tinh": day_int,
+            "thang_tiet_khi": tk,
+            "can": month_can,
+            "can_ten": can_name(month_can),
+            "chi": month_branch,
+            "chi_ten": chi_name(month_branch),
+            "cung": _palace_by_branch(chart, month_branch),
+            "is_tiet_khi_based": True,
+            "phuong_phap": "solarLongitude -> thang_tk -> Can Chi tháng",
+            "warning": "Nếu ngày xem nằm sát thời điểm giao tiết khí, cần giờ/phút để phân định tuyệt đối.",
         }
 
-    if month is not None and day is not None:
-        day_int = int(day)
-        max_day = 31
-        if not 1 <= day_int <= max_day:
-            raise ValueError("ngay_xem không hợp lệ")
+    if month_int is not None and day_int is not None:
         day_can, day_branch = can_chi_day(day_int, month_int, target_year)
         result["luu_nhat"] = {
             "ngay": day_int,
@@ -360,18 +448,28 @@ def calculate_van_layers(
             "can_ten": can_name(day_can),
             "chi": day_branch,
             "chi_ten": chi_name(day_branch),
-            "cung_so": _find_palace_by_branch(chart, day_branch),
-            "nhat_than_cung_so": _find_palace_by_branch(chart, day_branch),
+            "cung": _palace_by_branch(chart, day_branch),
+            "nhat_than_cung": _palace_by_branch(chart, day_branch),
+            "phuong_phap": "Julian Day -> checkcan(jd), check(jd+2)",
         }
-
         if hour is not None:
-            hour_can, hour_branch = can_chi_hour(day_can, int(hour))
+            hour_can, hour_chi = can_chi_hour(day_can, int(hour))
             result["luu_thoi"] = {
-                "chi_gio": hour_branch,
-                "chi_gio_ten": chi_name(hour_branch),
-                "can_gio": hour_can,
-                "can_gio_ten": can_name(hour_can),
-                "cung_so": _find_palace_by_branch(chart, hour_branch),
+                "chi": hour_chi,
+                "chi_ten": chi_name(hour_chi),
+                "can": hour_can,
+                "can_ten": can_name(hour_can),
+                "cung": _palace_by_branch(chart, hour_chi),
+                "phuong_phap": "Can giờ = checkcan(2*Can ngày + Chi giờ - 2)",
             }
 
+    result["rules_audit"] = {
+        "dai_van": "Cục + chiều Âm/Dương nam nữ + tuổi nằm trong khoảng Đại vận",
+        "tieu_van": "Ánh xạ Chi năm sinh/Chi năm xem theo block chitieuvan của nguồn",
+        "luu_nien": "Cung theo Chi năm xem + lndv(tuoi, cung_dai_van, bat_dau, step)",
+        "luu_nguyet": "Tiết khí bằng Solar Longitude; không đồng nhất tháng âm với tháng tiết khí",
+        "luu_nhat": "Julian Day + Can Chi ngày",
+        "luu_thoi": "Can Chi giờ từ Can ngày + Chi giờ",
+        "tu_tru_dai_van": "Khoảng cách tiết khí trước/sau chia 3 để ra tuổi nhập vận",
+    }
     return result
