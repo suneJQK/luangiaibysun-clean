@@ -1,8 +1,10 @@
 """Deterministic chart relations and structured vận context."""
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
+from tuvi_engine.ai_context import build_ai_context
 from tuvi_engine.van_calculator import calculate_van_layers
 from tuvi_engine.van_reasoning import build_reasoning_context
 from tuvi_engine.van_tieu_van_patch import build_tieu_van_source_mapping
@@ -56,24 +58,18 @@ def _branch_number(value: Any) -> int | None:
         return None
 
 
-def _repair_tieu_van(chart: dict[str, Any], van: dict[str, Any]) -> None:
-    """Ghi đè lớp Tiểu vận bằng công thức tuổi năm đã kiểm chứng.
-
-    Đây là lớp bảo vệ tại điểm xuất dữ liệu cho app, để bản tính cũ trong
-    ``van_calculator.py`` không thể làm sai vị trí Tiểu vận hiển thị.
-    """
+def _sync_tieu_van(chart: dict[str, Any], van: dict[str, Any]) -> None:
+    """Re-derive Tiểu vận from the canonical rule and verify the layer."""
     thien_ban = chart.get("thien_ban", {}) if isinstance(chart, dict) else {}
     inp = chart.get("input", {}) if isinstance(chart, dict) else {}
-
     birth_branch = _branch_number(thien_ban.get("chi_nam"))
     year_branch = _branch_number((van.get("year") or {}).get("chi"))
     age = van.get("age")
     gender = str(inp.get("gioi_tinh", "Nam"))
-
     if birth_branch is None or year_branch is None:
         return
 
-    corrected = build_tieu_van_source_mapping(
+    canonical = build_tieu_van_source_mapping(
         lambda x: (int(x) - 1) % 12 + 1,
         lambda x: BRANCHES[(int(x) - 1) % 12],
         birth_branch,
@@ -81,7 +77,21 @@ def _repair_tieu_van(chart: dict[str, Any], van: dict[str, Any]) -> None:
         gender,
         age=int(age) if age is not None else None,
     )
-    van["tieu_van"] = corrected
+    van["tieu_van"] = canonical
+
+
+def _dynamic_sync_contract(van: dict[str, Any]) -> dict[str, Any]:
+    tieu = van.get("tieu_van") or {}
+    year = van.get("year") or {}
+    return {
+        "source_of_truth": "calculate_van_layers",
+        "year": year.get("nam"),
+        "year_chi": year.get("chi_ten"),
+        "tieu_van_cung_so": tieu.get("cung_so"),
+        "tieu_van_chi": tieu.get("chi_ten"),
+        "tieu_van_tuoi": tieu.get("tuoi"),
+        "static_palace_tieu_van_must_not_be_used": True,
+    }
 
 
 def calculate_chart(
@@ -115,14 +125,18 @@ def calculate_chart(
         hour=hour,
     )
 
-    # Sửa lớp Tiểu vận ngay trước khi xây reasoning_context và trước khi
-    # trả dữ liệu cho API/UI.
-    _repair_tieu_van(chart, van)
-
+    # Giữ một nguồn xác thực duy nhất cho Tiểu vận trước mọi downstream layer.
+    _sync_tieu_van(chart, van)
+    van["sync_contract"] = _dynamic_sync_contract(van)
     van["reasoning_context"] = build_reasoning_context(chart, van)
 
+    # Quan trọng: ai_context được tạo LẠI sau khi đã có năm xem và Tiểu vận.
+    # build_ai_context() loại toàn bộ dynamic vận khỏi từng palace và đặt
+    # chúng vào van_han như nguồn dữ liệu authoritative duy nhất.
+    chart["ai_context"] = build_ai_context(chart, van=deepcopy(van))
+
     return {
-        "calculator_version": "3.2",
+        "calculator_version": "3.3",
         "relations": relations,
         "van": van,
     }
