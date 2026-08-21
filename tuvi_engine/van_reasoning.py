@@ -21,7 +21,6 @@ from typing import Any
 
 BRANCHES = ["Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi", "Thân", "Dậu", "Tuất", "Hợi"]
 
-# Trọng số chỉ dùng để xếp thứ tự bằng chứng, không phải xác suất sự kiện.
 LAYER_WEIGHTS = {
     "nguyen_cuc": 100,
     "dai_van": 80,
@@ -111,13 +110,11 @@ def _relation(a: str, b: str) -> str:
         return "tam_hop"
     if d == 6:
         return "xung_chieu"
-    # 6 cặp Nhị hợp: Tý-Sửu, Dần-Hợi, Mão-Tuất, Thìn-Dậu, Tỵ-Thân, Ngọ-Mùi.
     if {a, b} in [
         {"Tý", "Sửu"}, {"Dần", "Hợi"}, {"Mão", "Tuất"},
         {"Thìn", "Dậu"}, {"Tỵ", "Thân"}, {"Ngọ", "Mùi"},
     ]:
         return "nhi_hop"
-    # Giáp cung là hai cung kề nhau về vị trí 12 cung; caller xử lý bằng cung_so.
     return "khac"
 
 
@@ -163,7 +160,7 @@ def _interactions(chart: dict[str, Any], target: dict[str, Any]) -> list[dict[st
         if palace.get("cung_so") == target.get("cung_so"):
             continue
         relation = _relation_between_palaces(target, palace)
-        if relation in {"dong_cung", "tam_hop", "xung_chieu", "nhi_hop", "giap_cung"}:
+        if relation in {"tam_hop", "xung_chieu", "nhi_hop", "giap_cung"}:
             interactions.append({
                 "quan_he": relation,
                 "cung_so": palace.get("cung_so"),
@@ -171,9 +168,67 @@ def _interactions(chart: dict[str, Any], target: dict[str, Any]) -> list[dict[st
                 "dia_chi": palace.get("dia_chi"),
                 "stars": _stars(palace),
             })
-    order = {"dong_cung": 0, "tam_hop": 1, "xung_chieu": 2, "nhi_hop": 3, "giap_cung": 4}
+    order = {"tam_hop": 0, "xung_chieu": 1, "nhi_hop": 2, "giap_cung": 3}
     interactions.sort(key=lambda x: order.get(x["quan_he"], 99))
     return interactions
+
+
+def _tieu_van_tam_phuong_tu_chinh(chart: dict[str, Any], van: dict[str, Any]) -> dict[str, Any]:
+    """Xác định Tam phương Tứ chính của CHÍNH CUNG TIỂU VẬN.
+
+    Đây là nguồn authoritative cho luận hạn. Không lấy Quan/Tài/Tật/Di theo
+    tên chức năng. Trước hết phải lấy đúng vị trí ``cung_so`` của Tiểu vận,
+    sau đó xác định quan hệ hình học từ chính cung đó.
+    """
+    tieu = van.get("tieu_van") or {}
+    target_number = tieu.get("cung_so")
+    target = _palace_by_number(chart, target_number)
+    if not target:
+        return {"cung_tieu_van": None, "tam_phuong": [], "xung_chieu": None, "nhi_hop": None, "giap_cung": []}
+
+    tam_phuong: list[dict[str, Any]] = []
+    xung_chieu: dict[str, Any] | None = None
+    nhi_hop: dict[str, Any] | None = None
+    giap_cung: list[dict[str, Any]] = []
+
+    for palace in chart.get("12_cung", {}).values():
+        if palace.get("cung_so") == target.get("cung_so"):
+            continue
+        relation = _relation_between_palaces(target, palace)
+        item = {
+            "cung_so": palace.get("cung_so"),
+            "cung": palace.get("cung"),
+            "dia_chi": palace.get("dia_chi"),
+            "can_chi": palace.get("can_chi"),
+            "stars": _stars(palace),
+        }
+        if relation == "tam_hop":
+            tam_phuong.append(item)
+        elif relation == "xung_chieu":
+            xung_chieu = item
+        elif relation == "nhi_hop":
+            nhi_hop = item
+        elif relation == "giap_cung":
+            giap_cung.append(item)
+
+    tam_phuong.sort(key=lambda x: int(x.get("cung_so") or 0))
+    giap_cung.sort(key=lambda x: int(x.get("cung_so") or 0))
+
+    return {
+        "cung_tieu_van": {
+            "cung_so": target.get("cung_so"),
+            "cung": target.get("cung"),
+            "dia_chi": target.get("dia_chi"),
+            "can_chi": target.get("can_chi"),
+            "stars": _stars(target),
+        },
+        "tam_phuong": tam_phuong,
+        "xung_chieu": xung_chieu,
+        "nhi_hop": nhi_hop,
+        "giap_cung": giap_cung,
+        "rule": "Lấy chính cung_so của Tiểu vận; Tam hợp = Địa Chi cách 4/8; Xung chiếu = cách 6; Nhị hợp = cặp Địa Chi cố định; Giáp cung = vị trí cung_so kề nhau.",
+        "anti_confusion": "Không được chọn cung Quan/Tài/Tật/Di chỉ vì tên chức năng; phải xác định quan hệ thực tế từ cung Tiểu vận trước, sau đó mới gắn tên cung chức năng.",
+    }
 
 
 def _tuan_triet(palace: dict[str, Any]) -> dict[str, bool]:
@@ -202,13 +257,15 @@ def build_reasoning_context(chart: dict[str, Any], van: dict[str, Any]) -> dict[
         })
 
     evidence.sort(key=lambda x: -x["priority"])
+    tieu_van_ttp = _tieu_van_tam_phuong_tu_chinh(chart, van)
 
-    # Các câu hỏi vận hạn phải trả lời theo đúng thứ tự, tránh AI nhảy thẳng vào sự kiện.
     workflow = [
         "Xác định tuổi/năm và tầng vận đang kích hoạt.",
-        "Xác định cung trọng điểm của Đại vận và Lưu niên; không coi Lưu niên thay thế Đại vận.",
+        "Xác định cung bị kích hoạt ở đúng tầng vận; không thay thế bằng cung chức năng khác.",
         "Đọc đồng cung: chính tinh -> phụ tinh -> sát tinh/bại tinh -> Tứ Hóa/Tuần/Triệt nếu có.",
-        "Đọc Tam Hợp và Xung Chiếu của cung trọng điểm.",
+        "Với Tiểu vận: bắt buộc lấy chính cung_so của Tiểu vận để xác định Tam phương Tứ chính.",
+        "Tam hợp = hai cung có Địa Chi cách 4 hoặc 8; Xung chiếu = cách 6; Nhị hợp = cặp Địa Chi cố định; Giáp cung = vị trí cung_so kề nhau.",
+        "Chỉ sau khi xác định quan hệ hình học mới gọi tên cung chức năng Quan/Tài/Tật/Di...",
         "Đọc Nhị Hợp và Giáp Cung như lớp bổ trợ.",
         "Đối chiếu với Mệnh/Thân và các cung chức năng liên quan đến câu hỏi.",
         "Xét Lưu nguyệt/Lưu nhật/Lưu thời chỉ sau khi nền Đại vận + Lưu niên đã rõ.",
@@ -216,9 +273,10 @@ def build_reasoning_context(chart: dict[str, Any], van: dict[str, Any]) -> dict[
     ]
 
     return {
-        "engine": "van_reasoning_v1",
+        "engine": "van_reasoning_v2",
         "workflow": workflow,
         "active_layers": evidence,
+        "tieu_van_tam_phuong_tu_chinh": tieu_van_ttp,
         "principles": {
             "dai_van": "lớp nền dài hạn",
             "luu_nien": "kích hoạt chủ đề trong năm",
@@ -234,5 +292,6 @@ def build_reasoning_context(chart: dict[str, Any], van: dict[str, Any]) -> dict[
             "Không dùng Lưu nguyệt để phủ định nền Đại vận nếu không có bằng chứng tầng cao.",
             "Không luận một sự kiện chắc chắn chỉ từ một sát tinh.",
             "Phải ghi rõ lớp nào tạo nền và lớp nào tạo kích hoạt.",
+            "Tam phương Tứ chính của Tiểu vận phải lấy theo vị trí thực tế của cung Tiểu vận, không lấy theo danh xưng Quan/Tài/Tật/Di.",
         ],
     }
