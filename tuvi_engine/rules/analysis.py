@@ -6,6 +6,7 @@ from typing import Any
 from ..ai_context import build_ai_context
 from .cach_cuc import detect_cach_cuc
 from .modifiers import detect_cach_cuc_modifiers
+from .relationships import attach_palace_relationships
 
 
 def _build_cach_cuc_analysis(
@@ -48,14 +49,16 @@ def _build_cach_cuc_analysis(
 
 
 def analyze_chart(chart: dict[str, Any]) -> dict[str, Any]:
-    result = dict(chart)
-    matched = detect_cach_cuc(chart)
-    modifiers = detect_cach_cuc_modifiers(chart)
+    # Quan hệ cung là dữ liệu cấu trúc. Resolve trước khi tạo AI context để
+    # Nhị Hợp không còn phụ thuộc vào thứ tự ô trên giao diện hoặc suy đoán AI.
+    result = attach_palace_relationships(chart)
+    matched = detect_cach_cuc(result)
+    modifiers = detect_cach_cuc_modifiers(result)
     result["cach_cuc"] = matched
     result["cach_cuc_modifiers"] = modifiers
     result["cach_cuc_analysis"] = _build_cach_cuc_analysis(matched, modifiers)
 
-    tb = chart.get("thien_ban") or {}
+    tb = result.get("thien_ban") or {}
     result["luan_giai"] = {
         "menh": {
             "cung": "Mệnh",
@@ -67,7 +70,7 @@ def analyze_chart(chart: dict[str, Any]) -> dict[str, Any]:
         "cach_cuc": result["cach_cuc_analysis"],
         "van_han": {
             "dai_han": "Đang sử dụng dữ liệu đại vận của từng cung khi engine nguồn cung cấp.",
-            "tieu_han": "Đang sử dụng dữ liệu tiểu hạn của từng cung khi engine nguồn cung cấp.",
+            "tieu_han": "Đang sử dụng dữ liệu tiểu vận của từng cung khi engine nguồn cung cấp.",
             "luu_nien": "Rule layer sẵn sàng mở rộng khi bổ sung bảng lưu niên.",
         },
     }
@@ -78,5 +81,7 @@ def analyze_chart(chart: dict[str, Any]) -> dict[str, Any]:
     ai_context["reasoning_contract"]["cach_cuc_is_mandatory"] = True
     ai_context["reasoning_contract"]["cach_cuc_evidence_first"] = True
     ai_context["reasoning_contract"]["cach_cuc_modifiers_are_mandatory"] = True
+    ai_context["reasoning_contract"]["nhi_hop_is_deterministic"] = True
+    ai_context["reasoning_contract"]["nhi_hop_source"] = "12 Địa Chi / Lục Hợp; không được tự suy đoán từ vị trí giao diện"
     result["ai_context"] = ai_context
     return result
