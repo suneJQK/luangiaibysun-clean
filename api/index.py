@@ -28,7 +28,7 @@ WEB_INDEX = ROOT / "index.html"
 AI_MODE_INDEX = ROOT / "ai_mode.html"
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
-app = FastAPI(title="TV AI - Tử Vi Đẩu Số", version="2.5")
+app = FastAPI(title="TV AI - Tử Vi Đẩu Số", version="2.6")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -47,6 +47,11 @@ class BirthRequest(BaseModel):
     ten: str = ""
     duong_lich: bool = True
     time_zone: float = 7.0
+    # Ngày/giờ xem là tùy chọn để không phá client cũ.
+    nam_xem: int | None = Field(default=None, ge=1800, le=2200)
+    thang_xem: int | None = Field(default=None, ge=1, le=12)
+    ngay_xem: int | None = Field(default=None, ge=1, le=31)
+    gio_xem: int | None = Field(default=None, ge=1, le=12)
 
 
 class AskRequest(BirthRequest):
@@ -112,6 +117,15 @@ def _prepare_chart(req: BirthRequest) -> dict[str, Any]:
     return normalize_engine_chart(analyzed)
 
 
+def _view_args(req: BirthRequest, default_year: int | None = None) -> dict[str, Any]:
+    return {
+        "year": req.nam_xem if req.nam_xem is not None else default_year,
+        "month": req.thang_xem,
+        "day": req.ngay_xem,
+        "hour": req.gio_xem,
+    }
+
+
 def _save_profile(req: BirthRequest) -> dict[str, Any]:
     try:
         from google_sheets_storage import save_user_profile
@@ -146,7 +160,7 @@ def ai_mode_page() -> FileResponse:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"status": "ok", "service": "tv-ai", "version": "2.5"}
+    return {"status": "ok", "service": "tv-ai", "version": "2.6"}
 
 
 @app.get("/api/ai-modes")
@@ -192,6 +206,8 @@ def cach_cuc() -> dict[str, Any]:
 def lap_so(req: BirthRequest) -> dict[str, Any]:
     try:
         chart = _prepare_chart(req)
+        calc = calculate_chart(chart, **_view_args(req))
+        chart["van"] = calc.get("van", {})
         save_status = _save_profile(req)
         chart.setdefault("storage", {})["user_profile"] = save_status
         return chart
@@ -203,13 +219,21 @@ def lap_so(req: BirthRequest) -> dict[str, Any]:
 def luan_giai(req: AskRequest, request: Request) -> dict[str, Any]:
     try:
         chart = _prepare_chart(req)
-        calc = calculate_chart(chart)
+        target_year = req.year if req.year is not None else req.nam_xem
+        calc = calculate_chart(
+            chart,
+            year=target_year,
+            month=req.thang_xem,
+            day=req.ngay_xem,
+            hour=req.gio_xem,
+        )
+        chart["van"] = calc.get("van", {})
         ai_context = chart.get("ai_context", {})
         cach_cuc_analysis = chart.get("cach_cuc_analysis", {})
         books = _load_json(BOOKS_FILE, {})
         mode_text, mode_id = _load_ai_mode(request.cookies.get("tv_ai_mode", "standard"))
         provider_id = normalize_provider(req.provider or request.cookies.get("tv_ai_provider", "gemini"))
-        prompt = f'''Năm luận: {req.year or date.today().year}\n\nCHẾ ĐỘ LUẬN GIẢI ĐƯỢC CHỌN:\n{mode_text}\n\nCÂU HỎI:\n{req.question}\n\nDỮ LIỆU LÁ SỐ:\n{_compact(chart)}\n\nBẰNG CHỨNG CÁCH CỤC:\n{_compact(cach_cuc_analysis, 30000)}\n\nQUAN HỆ CUNG:\n{_compact(ai_context.get("relationship_knowledge", {}), 20000)}\n\nCONTEXT AI:\n{_compact(ai_context, 50000)}\n\nTÍNH TOÁN KHÁC:\n{_compact(calc, 30000)}\n\nTÀI LIỆU:\n{_compact(books, 40000)}\n\nQUY TẮC BẮT BUỘC:\n- Chỉ dùng Cách Cục đã match từ engine.\n- Cách Cục lõi và modifier phá/giảm phải được luận riêng rồi tổng hợp.\n- Đối chiếu Đồng cung, Tam Hợp, Xung Chiếu, Nhị Hợp, Giáp Cung và Tuần/Triệt.\n- Không tự an sao, không tự thêm hoặc sửa dữ liệu engine.\n- Nếu không có Cách Cục match, nói rõ là chưa xác định được từ bộ điều kiện hiện tại.'''
+        prompt = f'''Năm luận: {target_year or date.today().year}\n\nCHẾ ĐỘ LUẬN GIẢI ĐƯỢC CHỌN:\n{mode_text}\n\nCÂU HỎI:\n{req.question}\n\nDỮ LIỆU LÁ SỐ:\n{_compact(chart)}\n\nCÁC LỚP VẬN:\n{_compact(calc.get("van", {}), 30000)}\n\nBẰNG CHỨNG CÁCH CỤC:\n{_compact(cach_cuc_analysis, 30000)}\n\nQUAN HỆ CUNG:\n{_compact(ai_context.get("relationship_knowledge", {}), 20000)}\n\nCONTEXT AI:\n{_compact(ai_context, 50000)}\n\nTÍNH TOÁN KHÁC:\n{_compact(calc, 30000)}\n\nTÀI LIỆU:\n{_compact(books, 40000)}\n\nQUY TẮC BẮT BUỘC:\n- Chỉ dùng Cách Cục đã match từ engine.\n- Phân biệt rõ Đại vận, Tiểu vận, Lưu niên, Lưu nguyệt, Lưu nhật, Lưu thời.\n- Lưu nguyệt phải ưu tiên tháng Tiết khí; không đồng nhất tháng âm lịch với tháng Tiết khí.\n- Đối chiếu Đồng cung, Tam Hợp, Xung Chiếu, Nhị Hợp, Giáp Cung và Tuần/Triệt.\n- Không tự an sao, không tự thêm hoặc sửa dữ liệu engine.\n- Nếu thiếu ngày/tháng/giờ xem, không bịa Lưu nhật/Lưu thời; chỉ luận tới tầng dữ liệu thực có.'''
         answer, selected_provider = generate_ai(
             provider=provider_id,
             system_instruction=_system_prompt() + "\nAI chỉ diễn giải dữ liệu từ engine Python local.",
