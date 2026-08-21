@@ -5,6 +5,7 @@ from typing import Any
 
 from tuvi_engine.van_calculator import calculate_van_layers
 from tuvi_engine.van_reasoning import build_reasoning_context
+from tuvi_engine.van_tieu_van_patch import build_tieu_van_source_mapping
 
 BRANCHES = ["Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi", "Thân", "Dậu", "Tuất", "Hợi"]
 NHI_HOP = {
@@ -45,6 +46,44 @@ def relation(a: dict[str, Any], b: dict[str, Any]) -> str:
     return "other"
 
 
+def _branch_number(value: Any) -> int | None:
+    if isinstance(value, int) and 1 <= value <= 12:
+        return value
+    text = str(value or "").strip()
+    try:
+        return BRANCHES.index(text) + 1
+    except ValueError:
+        return None
+
+
+def _repair_tieu_van(chart: dict[str, Any], van: dict[str, Any]) -> None:
+    """Ghi đè lớp Tiểu vận bằng công thức tuổi năm đã kiểm chứng.
+
+    Đây là lớp bảo vệ tại điểm xuất dữ liệu cho app, để bản tính cũ trong
+    ``van_calculator.py`` không thể làm sai vị trí Tiểu vận hiển thị.
+    """
+    thien_ban = chart.get("thien_ban", {}) if isinstance(chart, dict) else {}
+    inp = chart.get("input", {}) if isinstance(chart, dict) else {}
+
+    birth_branch = _branch_number(thien_ban.get("chi_nam"))
+    year_branch = _branch_number((van.get("year") or {}).get("chi"))
+    age = van.get("age")
+    gender = str(inp.get("gioi_tinh", "Nam"))
+
+    if birth_branch is None or year_branch is None:
+        return
+
+    corrected = build_tieu_van_source_mapping(
+        lambda x: (int(x) - 1) % 12 + 1,
+        lambda x: BRANCHES[(int(x) - 1) % 12],
+        birth_branch,
+        year_branch,
+        gender,
+        age=int(age) if age is not None else None,
+    )
+    van["tieu_van"] = corrected
+
+
 def calculate_chart(
     chart: dict[str, Any],
     *,
@@ -75,10 +114,15 @@ def calculate_chart(
         day=day,
         hour=hour,
     )
+
+    # Sửa lớp Tiểu vận ngay trước khi xây reasoning_context và trước khi
+    # trả dữ liệu cho API/UI.
+    _repair_tieu_van(chart, van)
+
     van["reasoning_context"] = build_reasoning_context(chart, van)
 
     return {
-        "calculator_version": "3.1",
+        "calculator_version": "3.2",
         "relations": relations,
         "van": van,
     }
