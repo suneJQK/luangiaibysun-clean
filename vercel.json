@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/", "destination": "/api/ui_theme.py" }
+  ]
+}
