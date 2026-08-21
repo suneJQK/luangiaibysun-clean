@@ -23,16 +23,18 @@ def lapDiaBan(diaBan, nn, tt, nnnn, gioSinh, gioiTinh, duongLich, timeZone):
 
     viTriTuVi = timTuVi(cucSo, nn)
     viTriLiemTrinh = dichCung(viTriTuVi, 4)
+    viTriThienDong = dichCung(viTriTuVi, 7)
+    viTriVuKhuc = dichCung(viTriTuVi, 8)
+    viTriThaiDuong = dichCung(viTriTuVi, 9)
+    viTriThienCo = dichCung(viTriTuVi, 11)
     for pos, sao in [
         (viTriTuVi, saoTuVi),
         (viTriLiemTrinh, saoLiemTrinh),
-        (dichCung(viTriTuVi, 7), saoThienDong),
-        (dichCung(viTriTuVi, 8), saoVuKhuc),
-        (dichCung(viTriTuVi, 9), saoThaiDuong),
-        (dichCung(viTriTuVi, 11), saoThienCo),
+        (viTriThienDong, saoThienDong),
+        (viTriVuKhuc, saoVuKhuc),
+        (viTriThaiDuong, saoThaiDuong),
+        (viTriThienCo, saoThienCo),
     ]: diaBan.nhapSao(pos, sao)
-    vitriThaiDuong = dichCung(viTriTuVi, 9)
-    viTriThienCo = dichCung(viTriTuVi, 11)
 
     viTriThienPhu = dichCung(3, 3 - viTriTuVi)
     for offset, sao in [(0,saoThienPhu),(1,saoThaiAm),(2,saoThamLang),(3,saoCuMon),(4,saoThienTuong),(5,saoThienLuong),(6,saoThatSat),(10,saoPhaQuan)]:
@@ -102,14 +104,14 @@ def lapDiaBan(diaBan, nn, tt, nnnn, gioSinh, gioiTinh, duongLich, timeZone):
     viTriPhaToai=timPhaToai(chiNam); diaBan.nhapSao(viTriPhaToai,saoPhaToai)
     viTriDauQuan=dichCung(chiNam,-tt+gioSinh); diaBan.nhapSao(viTriDauQuan,saoDauQuan)
 
-    if canNam==1: viTriHoaLoc,viTriHoaQuyen,viTriHoaKhoa,viTriHoaKy=viTriLiemTrinh,viTriPhaQuan,viTriVuKhuc,vitriThaiDuong
+    if canNam==1: viTriHoaLoc,viTriHoaQuyen,viTriHoaKhoa,viTriHoaKy=viTriLiemTrinh,viTriPhaQuan,viTriVuKhuc,viTriThaiDuong
     elif canNam==2: viTriHoaLoc,viTriHoaQuyen,viTriHoaKhoa,viTriHoaKy=viTriThienCo,viTriThienLuong,viTriTuVi,viTriThaiAm
     elif canNam==3: viTriHoaLoc,viTriHoaQuyen,viTriHoaKhoa,viTriHoaKy=dichCung(viTriTuVi,7),viTriThienCo,viTriVanXuong,viTriLiemTrinh
     elif canNam==4: viTriHoaLoc,viTriHoaQuyen,viTriHoaKhoa,viTriHoaKy=viTriThaiAm,dichCung(viTriTuVi,7),viTriThienCo,viTriCuMon
     elif canNam==5: viTriHoaLoc,viTriHoaQuyen,viTriHoaKhoa,viTriHoaKy=viTriThamLang,viTriThaiAm,viTriHuuBat,viTriThienCo
     elif canNam==6: viTriHoaLoc,viTriHoaQuyen,viTriHoaKhoa,viTriHoaKy=viTriVuKhuc,viTriThamLang,viTriThienLuong,viTriVanKhuc
-    elif canNam==7: viTriHoaLoc,viTriHoaQuyen,viTriHoaKhoa,viTriHoaKy=vitriThaiDuong,viTriVuKhuc,dichCung(viTriTuVi,7),viTriThaiAm
-    elif canNam==8: viTriHoaLoc,viTriHoaQuyen,viTriHoaKhoa,viTriHoaKy=viTriCuMon,vitriThaiDuong,viTriVanKhuc,viTriVanXuong
+    elif canNam==7: viTriHoaLoc,viTriHoaQuyen,viTriHoaKhoa,viTriHoaKy=viTriThaiDuong,viTriVuKhuc,dichCung(viTriTuVi,7),viTriThaiAm
+    elif canNam==8: viTriHoaLoc,viTriHoaQuyen,viTriHoaKhoa,viTriHoaKy=viTriCuMon,viTriThaiDuong,viTriVanKhuc,viTriVanXuong
     elif canNam==9: viTriHoaLoc,viTriHoaQuyen,viTriHoaKhoa,viTriHoaKy=viTriThienLuong,viTriTuVi,viTriThienPhu,viTriVuKhuc
     else: viTriHoaLoc,viTriHoaQuyen,viTriHoaKhoa,viTriHoaKy=viTriPhaQuan,viTriCuMon,viTriThaiAm,viTriThamLang
     for pos,sao in [(viTriHoaLoc,saoHoaLoc),(viTriHoaQuyen,saoHoaQuyen),(viTriHoaKhoa,saoHoaKhoa),(viTriHoaKy,saoHoaKy)]: diaBan.nhapSao(pos,sao)
