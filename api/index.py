@@ -28,7 +28,7 @@ WEB_INDEX = ROOT / "index.html"
 AI_MODE_INDEX = ROOT / "ai_mode.html"
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
-app = FastAPI(title="TV AI - Tử Vi Đẩu Số", version="2.6")
+app = FastAPI(title="TV AI - Tử Vi Đẩu Số", version="2.7")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -47,7 +47,6 @@ class BirthRequest(BaseModel):
     ten: str = ""
     duong_lich: bool = True
     time_zone: float = 7.0
-    # Ngày/giờ xem là tùy chọn để không phá client cũ.
     nam_xem: int | None = Field(default=None, ge=1800, le=2200)
     thang_xem: int | None = Field(default=None, ge=1, le=12)
     ngay_xem: int | None = Field(default=None, ge=1, le=31)
@@ -160,7 +159,7 @@ def ai_mode_page() -> FileResponse:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"status": "ok", "service": "tv-ai", "version": "2.6"}
+    return {"status": "ok", "service": "tv-ai", "version": "2.7"}
 
 
 @app.get("/api/ai-modes")
@@ -233,7 +232,8 @@ def luan_giai(req: AskRequest, request: Request) -> dict[str, Any]:
         books = _load_json(BOOKS_FILE, {})
         mode_text, mode_id = _load_ai_mode(request.cookies.get("tv_ai_mode", "standard"))
         provider_id = normalize_provider(req.provider or request.cookies.get("tv_ai_provider", "gemini"))
-        prompt = f'''Năm luận: {target_year or date.today().year}\n\nCHẾ ĐỘ LUẬN GIẢI ĐƯỢC CHỌN:\n{mode_text}\n\nCÂU HỎI:\n{req.question}\n\nDỮ LIỆU LÁ SỐ:\n{_compact(chart)}\n\nCÁC LỚP VẬN:\n{_compact(calc.get("van", {}), 30000)}\n\nBẰNG CHỨNG CÁCH CỤC:\n{_compact(cach_cuc_analysis, 30000)}\n\nQUAN HỆ CUNG:\n{_compact(ai_context.get("relationship_knowledge", {}), 20000)}\n\nCONTEXT AI:\n{_compact(ai_context, 50000)}\n\nTÍNH TOÁN KHÁC:\n{_compact(calc, 30000)}\n\nTÀI LIỆU:\n{_compact(books, 40000)}\n\nQUY TẮC BẮT BUỘC:\n- Chỉ dùng Cách Cục đã match từ engine.\n- Phân biệt rõ Đại vận, Tiểu vận, Lưu niên, Lưu nguyệt, Lưu nhật, Lưu thời.\n- Lưu nguyệt phải ưu tiên tháng Tiết khí; không đồng nhất tháng âm lịch với tháng Tiết khí.\n- Đối chiếu Đồng cung, Tam Hợp, Xung Chiếu, Nhị Hợp, Giáp Cung và Tuần/Triệt.\n- Không tự an sao, không tự thêm hoặc sửa dữ liệu engine.\n- Nếu thiếu ngày/tháng/giờ xem, không bịa Lưu nhật/Lưu thời; chỉ luận tới tầng dữ liệu thực có.'''
+        reasoning = calc.get("van", {}).get("reasoning_context", {})
+        prompt = f'''Năm luận: {target_year or date.today().year}\n\nCHẾ ĐỘ LUẬN GIẢI ĐƯỢC CHỌN:\n{mode_text}\n\nCÂU HỎI:\n{req.question}\n\nDỮ LIỆU LÁ SỐ:\n{_compact(chart)}\n\nCÁC LỚP VẬN:\n{_compact(calc.get("van", {}), 30000)}\n\nCÂY SUY LUẬN VẬN HẠN:\n{_compact(reasoning, 35000)}\n\nBẰNG CHỨNG CÁCH CỤC:\n{_compact(cach_cuc_analysis, 30000)}\n\nQUAN HỆ CUNG:\n{_compact(ai_context.get("relationship_knowledge", {}), 20000)}\n\nCONTEXT AI:\n{_compact(ai_context, 50000)}\n\nTÍNH TOÁN KHÁC:\n{_compact(calc, 30000)}\n\nTÀI LIỆU:\n{_compact(books, 40000)}\n\nQUY TẮC BẮT BUỘC:\n- Phải luận theo workflow trong CÂY SUY LUẬN VẬN HẠN, không bỏ qua Đại vận để nhảy thẳng sang Lưu niên/tháng.\n- Phân biệt rõ: Nguyên cục là nền; Đại vận là nền dài hạn; Lưu niên/Tiểu vận là kích hoạt năm; Lưu nguyệt/Lưu nhật/Lưu thời chỉ là lớp kích hoạt vi mô.\n- Đọc Đồng cung trước, sau đó Tam Hợp + Xung Chiếu, rồi Nhị Hợp + Giáp Cung và Tuần/Triệt.\n- Không gọi Giáp Cung là Nhị Hợp. Không gọi Xung Chiếu là Tam Hợp.\n- Một sự kiện mạnh phải có nhiều lớp cùng quy tụ; không kết luận chắc chắn từ một sao, một sát tinh hoặc một quan hệ đơn lẻ.\n- Chỉ dùng Cách Cục đã match từ engine.\n- Lưu nguyệt phải ưu tiên Tiết khí; không đồng nhất tháng âm lịch với tháng Tiết khí.\n- Không tự an sao, không tự thêm hoặc sửa dữ liệu engine.\n- Nếu thiếu ngày/tháng/giờ xem, không bịa Lưu nhật/Lưu thời; chỉ luận tới tầng dữ liệu thực có.'''
         answer, selected_provider = generate_ai(
             provider=provider_id,
             system_instruction=_system_prompt() + "\nAI chỉ diễn giải dữ liệu từ engine Python local.",
