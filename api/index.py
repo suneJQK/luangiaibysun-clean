@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
 from tuvi_lap_so_engine import lap_la_so
@@ -28,7 +28,7 @@ WEB_INDEX = ROOT / "index.html"
 AI_MODE_INDEX = ROOT / "ai_mode.html"
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
-app = FastAPI(title="TV AI - Tử Vi Đẩu Số", version="2.8")
+app = FastAPI(title="TV AI - Tử Vi Đẩu Số", version="2.9")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -55,7 +55,7 @@ class BirthRequest(BaseModel):
 
 class AskRequest(BirthRequest):
     question: str = Field(min_length=1, max_length=8000)
-    year: int | None = None
+    year: int | None = Field(default=None, ge=1800, le=2200)
     provider: str | None = None
 
 
@@ -116,9 +116,14 @@ def _prepare_chart(req: BirthRequest) -> dict[str, Any]:
     return normalize_engine_chart(analyzed)
 
 
+def _view_year(req: BirthRequest, explicit_year: int | None = None) -> int:
+    """Năm xem là một lựa chọn độc lập với năm sinh."""
+    return int(explicit_year if explicit_year is not None else (req.nam_xem if req.nam_xem is not None else date.today().year))
+
+
 def _view_args(req: BirthRequest, default_year: int | None = None) -> dict[str, Any]:
     return {
-        "year": req.nam_xem if req.nam_xem is not None else default_year,
+        "year": _view_year(req, default_year),
         "month": req.thang_xem,
         "day": req.ngay_xem,
         "hour": req.gio_xem,
@@ -172,11 +177,95 @@ def _ai_context_for_request(chart: dict[str, Any], calc: dict[str, Any]) -> dict
     return context
 
 
-@app.get("/", response_class=FileResponse)
-def root() -> FileResponse:
+def _inject_viewing_year_ui(html: str) -> str:
+    """Thêm trường Năm xem và ghi đè các hàm frontend mà không sửa index.html gốc."""
+    marker = '<div class="field"><label>Giới tính</label>'
+    year_field = '<div class="field"><label>Năm xem</label><input id="viewYear" type="number" min="1800" max="2200" value="2026"><div class="field-help">Năm dùng để tính Tiểu vận / Lưu niên. Không phải năm sinh.</div></div>'
+    if 'id="viewYear"' not in html and marker in html:
+        html = html.replace(marker, year_field + marker, 1)
+
+    script = r'''
+<script>
+(function(){
+  const currentYear=new Date().getFullYear();
+  const byId=id=>document.getElementById(id);
+  const viewYear=byId('viewYear');
+  if(viewYear && (!viewYear.value || Number(viewYear.value)<1800)) viewYear.value=currentYear;
+  try{
+    const oldLoad=window.loadUserProfile;
+    window.loadUserProfile=function(){
+      if(typeof oldLoad==='function') oldLoad();
+      const p=JSON.parse(localStorage.getItem('tvai_user_profile_v1')||'null');
+      if(p && p.viewYear!=null && byId('viewYear')) byId('viewYear').value=p.viewYear;
+      else if(byId('viewYear') && !byId('viewYear').value) byId('viewYear').value=currentYear;
+    };
+    const oldSave=window.saveUserProfile;
+    window.saveUserProfile=function(){
+      if(typeof oldSave==='function') oldSave();
+      try{
+        const p=JSON.parse(localStorage.getItem('tvai_user_profile_v1')||'{}');
+        p.viewYear=Number(byId('viewYear')?.value)||currentYear;
+        localStorage.setItem('tvai_user_profile_v1',JSON.stringify(p));
+      }catch{}
+    };
+  }catch{}
+
+  window.lapSo=async function(){
+    byId('status').innerHTML='<div class="msg">Đang lập lá số...</div>';
+    try{
+      window.saveUserProfile?.();
+      const viewingYear=Number(byId('viewYear')?.value)||currentYear;
+      const d=await window.call('/api/lap-so',{method:'POST',body:JSON.stringify({
+        ngay:Number(byId('day').value),
+        thang:Number(byId('month').value),
+        nam:Number(byId('year').value),
+        nam_xem:viewingYear,
+        gio_sinh:byId('hour').value,
+        gioi_tinh:byId('gender').value,
+        ten:byId('name').value,
+        duong_lich:byId('calendar').value==='true',
+        time_zone:Number(byId('tz').value)
+      })});
+      window.render(d);
+      byId('status').innerHTML='<div class="msg">Đã lập lá số · Năm xem: '+window.esc(viewingYear)+'</div>';
+    }catch(e){byId('status').innerHTML='<div class="msg">'+window.esc(e.message)+'</div>';}
+  };
+
+  window.askAI=async function(){
+    if(!window.chart)return;
+    const q=byId('question').value.trim();
+    if(!q)return;
+    window.addBubble('user',q); byId('question').value=''; byId('askBtn').disabled=true; window.showTyping();
+    try{
+      const viewingYear=Number(byId('viewYear')?.value)||currentYear;
+      const d=await window.call('/api/luan-giai',{method:'POST',body:JSON.stringify({
+        ngay:Number(byId('day').value),
+        thang:Number(byId('month').value),
+        nam:Number(byId('year').value),
+        nam_xem:viewingYear,
+        gio_sinh:byId('hour').value,
+        gioi_tinh:byId('gender').value,
+        ten:byId('name').value,
+        duong_lich:byId('calendar').value==='true',
+        time_zone:Number(byId('tz').value),
+        question:q,
+        year:viewingYear
+      })});
+      window.removeTyping(); window.addBubble('assistant',d.answer||'Chưa cấu hình AI API key');
+    }catch(e){window.removeTyping();window.addBubble('assistant','⚠️ '+e.message)}
+    finally{byId('askBtn').disabled=false;}
+  };
+})();
+</script>
+'''
+    return html.replace('</body>', script + '</body>')
+
+
+@app.get("/", response_class=HTMLResponse)
+def root() -> HTMLResponse:
     if not WEB_INDEX.exists():
         raise HTTPException(status_code=500, detail="Thiếu index.html")
-    return FileResponse(WEB_INDEX, media_type="text/html")
+    return HTMLResponse(_inject_viewing_year_ui(WEB_INDEX.read_text(encoding="utf-8")))
 
 
 @app.get("/ai-mode", response_class=FileResponse)
@@ -188,7 +277,7 @@ def ai_mode_page() -> FileResponse:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"status": "ok", "service": "tv-ai", "version": "2.8"}
+    return {"status": "ok", "service": "tv-ai", "version": "2.9"}
 
 
 @app.get("/api/ai-modes")
@@ -236,6 +325,7 @@ def lap_so(req: BirthRequest) -> dict[str, Any]:
         chart = _prepare_chart(req)
         calc = calculate_chart(chart, **_view_args(req))
         chart["van"] = calc.get("van", {})
+        chart.setdefault("viewing", {})["year"] = _view_year(req)
         save_status = _save_profile(req)
         chart.setdefault("storage", {})["user_profile"] = save_status
         return chart
@@ -247,7 +337,7 @@ def lap_so(req: BirthRequest) -> dict[str, Any]:
 def luan_giai(req: AskRequest, request: Request) -> dict[str, Any]:
     try:
         chart = _prepare_chart(req)
-        target_year = req.year if req.year is not None else req.nam_xem
+        target_year = _view_year(req, req.year)
         calc = calculate_chart(
             chart,
             year=target_year,
@@ -256,6 +346,7 @@ def luan_giai(req: AskRequest, request: Request) -> dict[str, Any]:
             hour=req.gio_xem,
         )
         chart["van"] = calc.get("van", {})
+        chart.setdefault("viewing", {})["year"] = target_year
         ai_context = _ai_context_for_request(chart, calc)
         cach_cuc_analysis = chart.get("cach_cuc_analysis", {})
         books = _load_json(BOOKS_FILE, {})
@@ -263,9 +354,7 @@ def luan_giai(req: AskRequest, request: Request) -> dict[str, Any]:
         provider_id = normalize_provider(req.provider or request.cookies.get("tv_ai_provider", "gemini"))
         reasoning = calc.get("van", {}).get("reasoning_context", {})
 
-        # Chỉ gửi AI dữ liệu nguồn đã đồng bộ. Không gửi `chart` thô vì nó có
-        # thể chứa các trường dynamic vận tĩnh ở từng cung từ engine cũ.
-        prompt = f'''Năm luận: {target_year or date.today().year}\n\nCHẾ ĐỘ LUẬN GIẢI ĐƯỢC CHỌN:\n{mode_text}\n\nCÂU HỎI:\n{req.question}\n\nCONTEXT AI CHÍNH THỨC:\n{_compact(ai_context, 70000)}\n\nCÁC LỚP VẬN ĐÃ TÍNH:\n{_compact(calc.get("van", {}), 35000)}\n\nCÂY SUY LUẬN VẬN HẠN:\n{_compact(reasoning, 35000)}\n\nBẰNG CHỨNG CÁCH CỤC:\n{_compact(cach_cuc_analysis, 30000)}\n\nQUAN HỆ CUNG:\n{_compact(ai_context.get("relationship_knowledge", {}), 20000)}\n\nTÀI LIỆU:\n{_compact(books, 40000)}\n\nQUY TẮC BẮT BUỘC:\n- Chỉ dùng CONTEXT AI CHÍNH THỨC và CÁC LỚP VẬN ĐÃ TÍNH làm nguồn sự kiện; không suy ngược Tiểu vận từ từng cung của lá số.\n- Phải luận theo workflow trong CÂY SUY LUẬN VẬN HẠN, không bỏ qua Đại vận để nhảy thẳng sang Lưu niên/tháng.\n- Phân biệt rõ: Nguyên cục là nền; Đại vận là nền dài hạn; Lưu niên/Tiểu vận là kích hoạt năm; Lưu nguyệt/Lưu nhật/Lưu thời chỉ là lớp kích hoạt vi mô.\n- Đọc Đồng cung trước, sau đó Tam Hợp + Xung Chiếu, rồi Nhị Hợp + Giáp Cung và Tuần/Triệt.\n- Không gọi Giáp Cung là Nhị Hợp. Không gọi Xung Chiếu là Tam Hợp.\n- Một sự kiện mạnh phải có nhiều lớp cùng quy tụ; không kết luận chắc chắn từ một sao, một sát tinh hoặc một quan hệ đơn lẻ.\n- Chỉ dùng Cách Cục đã match từ engine.\n- Lưu nguyệt phải ưu tiên Tiết khí; không đồng nhất tháng âm lịch với tháng Tiết khí.\n- Không tự an sao, không tự thêm hoặc sửa dữ liệu engine.\n- Nếu thiếu ngày/tháng/giờ xem, không bịa Lưu nhật/Lưu thời; chỉ luận tới tầng dữ liệu thực có.'''
+        prompt = f'''Năm luận: {target_year}\n\nCHẾ ĐỘ LUẬN GIẢI ĐƯỢC CHỌN:\n{mode_text}\n\nCÂU HỎI:\n{req.question}\n\nCONTEXT AI CHÍNH THỨC:\n{_compact(ai_context, 70000)}\n\nCÁC LỚP VẬN ĐÃ TÍNH:\n{_compact(calc.get("van", {}), 35000)}\n\nCÂY SUY LUẬN VẬN HẠN:\n{_compact(reasoning, 35000)}\n\nBẰNG CHỨNG CÁCH CỤC:\n{_compact(cach_cuc_analysis, 30000)}\n\nQUAN HỆ CUNG:\n{_compact(ai_context.get("relationship_knowledge", {}), 20000)}\n\nTÀI LIỆU:\n{_compact(books, 40000)}\n\nQUY TẮC BẮT BUỘC:\n- Chỉ dùng CONTEXT AI CHÍNH THỨC và CÁC LỚP VẬN ĐÃ TÍNH làm nguồn sự kiện; không suy ngược Tiểu vận từ từng cung của lá số.\n- Phải luận theo workflow trong CÂY SUY LUẬN VẬN HẠN, không bỏ qua Đại vận để nhảy thẳng sang Lưu niên/tháng.\n- Phân biệt rõ: Nguyên cục là nền; Đại vận là nền dài hạn; Lưu niên/Tiểu vận là kích hoạt năm; Lưu nguyệt/Lưu nhật/Lưu thời chỉ là lớp kích hoạt vi mô.\n- Đọc Đồng cung trước, sau đó Tam Hợp + Xung Chiếu, rồi Nhị Hợp + Giáp Cung và Tuần/Triệt.\n- Không gọi Giáp Cung là Nhị Hợp. Không gọi Xung Chiếu là Tam Hợp.\n- Một sự kiện mạnh phải có nhiều lớp cùng quy tụ; không kết luận chắc chắn từ một sao, một sát tinh hoặc một quan hệ đơn lẻ.\n- Chỉ dùng Cách Cục đã match từ engine.\n- Lưu nguyệt phải ưu tiên Tiết khí; không đồng nhất tháng âm lịch với tháng Tiết khí.\n- Không tự an sao, không tự thêm hoặc sửa dữ liệu engine.\n- Nếu thiếu ngày/tháng/giờ xem, không bịa Lưu nhật/Lưu thời; chỉ luận tới tầng dữ liệu thực có.'''
         answer, selected_provider = generate_ai(
             provider=provider_id,
             system_instruction=_system_prompt() + "\nAI chỉ diễn giải dữ liệu từ engine Python local.",
