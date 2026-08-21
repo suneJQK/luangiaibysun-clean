@@ -1,16 +1,23 @@
-"""Tính Tiểu vận theo quy tắc khởi cung và chiều nam/nữ.
+"""Tính Tiểu vận theo đúng quy tắc khởi cung và chiều nam/nữ.
 
 Quy tắc:
 - Thân/Tý/Thìn khởi tại Tuất.
 - Tỵ/Dậu/Sửu khởi tại Mùi.
 - Dần/Ngọ/Tuất khởi tại Thìn.
 - Hợi/Mão/Mùi khởi tại Sửu.
-- Tuổi 1 ở cung khởi; mỗi tuổi dịch một cung.
+- Chi năm sinh là mốc của tuổi 1 tại cung khởi.
 - Nam đi thuận; Nữ đi nghịch.
+- Từ Chi năm sinh đếm đến Chi năm xem; Chi năm xem nằm ở cung nào
+  thì đó là cung Tiểu vận/Tiểu hạn của năm đang xét.
 
-Hàm không gán cứng năm 2026 hay một tên cung cụ thể. Nó chỉ tính ra
-Địa Chi của cung Tiểu vận cho lá số/năm đang xét; tầng calculator sẽ
-tra Địa Chi đó vào 12 cung thực tế của chính lá số để lấy tên cung.
+Ví dụ Bính Tý nam 1996:
+Tý -> Tuất (mốc tuổi 1), sau đó đi thuận:
+Tý=Tuất, Sửu=Hợi, Dần=Tý, Mão=Sửu, Thìn=Dần, Tỵ=Mão,
+Ngọ=Thìn. Vì vậy năm 2026 Bính Ngọ -> cung Địa Chi Thìn.
+
+Hàm không gán cứng năm 2026 hay tên cung chức năng. Nó chỉ tính ra
+Địa Chi/cung vị trí của Tiểu vận; tầng calculator sẽ lấy đúng cung thực tế
+của lá số theo vị trí canonical 1..12.
 """
 from __future__ import annotations
 
@@ -58,11 +65,20 @@ def build_tieu_van_source_mapping(
     gender: str,
     age: int | None = None,
 ) -> dict[str, Any]:
-    """Tính vị trí Tiểu vận động theo đúng quy tắc khởi cung.
+    """Tính Tiểu vận theo mốc Chi năm sinh -> Chi năm xem.
 
-    ``target_branch`` chỉ là Chi của năm đang xem để ghi nhận/kiểm tra.
-    Vị trí Tiểu vận được xác định bởi tuổi mụ + cung khởi + chiều giới tính,
-    không phụ thuộc vào một năm cụ thể.
+    ``birth_branch`` là Chi năm sinh.
+    ``target_branch`` là Chi năm đang xem.
+
+    Tuổi mụ được giữ lại trong payload để hiển thị/đối chiếu, nhưng không còn
+    là nguồn quyết định vị trí chính. Vị trí chính được tính trực tiếp bằng
+    khoảng cách giữa Chi năm sinh và Chi năm xem, đúng chuỗi quy tắc:
+
+        Chi năm sinh -> cung khởi (tuổi 1)
+        rồi đếm thuận/nghịch tới Chi năm xem.
+
+    Điều này tránh việc một lớp tính theo tuổi và một lớp tính theo Chi tạo
+    ra hai nguồn Tiểu vận khác nhau.
     """
     birth_branch = check_fn(birth_branch)
     target_branch = check_fn(target_branch)
@@ -75,43 +91,56 @@ def build_tieu_van_source_mapping(
     start_branch_name = START_BRANCH_BY_BIRTH_GROUP[birth_branch]
     start_branch = branch_number(start_branch_name)
 
+    # Khoảng cách từ Chi năm sinh đến Chi năm xem.
+    # Nam: Tý -> Sửu -> Dần -> ... -> Ngọ là +6.
+    # Nữ: đếm ngược Chi.
+    target_offset = (
+        (target_branch - birth_branch) % 12
+        if is_male
+        else (birth_branch - target_branch) % 12
+    )
+
+    # Tuổi mụ chỉ là thông tin đối chiếu. Nếu không có tuổi, suy ra tuổi
+    # trong chu kỳ 12 năm từ chính khoảng cách Chi.
     if age is None:
-        # Khoảng cách Chi theo chu kỳ 12 năm; đây chỉ là fallback khi caller
-        # chưa cung cấp tuổi mụ thực tế.
-        delta = (target_branch - birth_branch) % 12 if is_male else (birth_branch - target_branch) % 12
-        age = delta + 1
+        age = target_offset + 1
     age = max(1, int(age))
 
-    offset = (age - 1) % 12
-    palace_branch = check_fn(start_branch + direction * offset)
+    palace_branch = check_fn(start_branch + direction * target_offset)
     palace_branch_name = chi_name_fn(palace_branch)
 
     sequence: list[dict[str, Any]] = []
     for step in range(12):
-        branch = check_fn(start_branch + direction * step)
+        birth_to_target_branch = check_fn(birth_branch + direction * step)
+        palace = check_fn(start_branch + direction * step)
         sequence.append({
-            "tuoi": step + 1,
-            "cung_dia_chi": branch,
-            "cung_dia_chi_ten": chi_name_fn(branch),
             "thu_tu": step + 1,
+            "tuoi_trong_chu_ky": step + 1,
+            "chi_nam": birth_to_target_branch,
+            "chi_nam_ten": chi_name_fn(birth_to_target_branch),
+            "cung_dia_chi": palace,
+            "cung_dia_chi_ten": chi_name_fn(palace),
         })
 
     return {
         "cung_dia_chi": palace_branch,
         "cung_dia_chi_ten": palace_branch_name,
+        # Cung số canonical của engine trùng vị trí 1..12 theo Địa Chi.
         "cung_so": palace_branch,
         "chi_nam": target_branch,
         "chi_ten": chi_name_fn(target_branch),
+        "chi_nam_sinh": birth_branch,
+        "chi_nam_sinh_ten": chi_name_fn(birth_branch),
+        "khoang_cach_chi": target_offset,
         "tuoi": age,
         "huong": "thuận" if direction == 1 else "nghịch",
         "cung_khoi": start_branch,
         "cung_khoi_ten": start_branch_name,
-        "phuong_phap": "Khởi cung theo nhóm Thân-Tý-Thìn/Tỵ-Dậu-Sửu/Dần-Ngọ-Tuất/Hợi-Mão-Mùi; tuổi 1 tại cung khởi; Nam thuận, Nữ nghịch",
+        "phuong_phap": "Lấy Chi năm sinh làm mốc tuổi 1 tại cung khởi; từ Chi năm sinh đếm thuận (Nam) hoặc nghịch (Nữ) đến Chi năm xem; Chi năm xem nằm ở cung nào thì đó là Tiểu vận",
         "source_formula": {
-            "tuoi_1": f"{start_branch_name}",
-            "tuoi_n": "dịch (tuổi - 1) cung theo chiều Nam thuận / Nữ nghịch",
-            "nam": "+1 Địa Chi cung mỗi tuổi",
-            "nu": "-1 Địa Chi cung mỗi tuổi",
+            "mo_c": "Chi năm sinh -> cung khởi",
+            "vi_tri_nam": "check(cung_khoi + direction * khoang_cach_chi)",
+            "khoang_cach_chi_nam": "Nam: (Chi_nam_xem - Chi_nam_sinh) mod 12; Nữ: (Chi_nam_sinh - Chi_nam_xem) mod 12",
         },
         "sequence": sequence,
     }
