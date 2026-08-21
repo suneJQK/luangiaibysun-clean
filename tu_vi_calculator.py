@@ -1,9 +1,10 @@
-"""Deterministic relations from the already-normalized chart only."""
+"""Deterministic chart relations and structured vận context."""
 from __future__ import annotations
 
 from typing import Any
 
 from tuvi_engine.van_calculator import calculate_van_layers
+from tuvi_engine.van_reasoning import build_reasoning_context
 
 BRANCHES = ["Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi", "Thân", "Dậu", "Tuất", "Hợi"]
 NHI_HOP = {
@@ -74,8 +75,10 @@ def calculate_chart(
         day=day,
         hour=hour,
     )
+    van["reasoning_context"] = build_reasoning_context(chart, van)
+
     return {
-        "calculator_version": "3.0",
+        "calculator_version": "3.1",
         "relations": relations,
         "van": van,
     }
