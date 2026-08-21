@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "version": "2.0",
+  "version": "2.1",
   "purpose": "Knowledge base for AI interpretation of relationships between the 12 palaces.",
-  "source": "_chart.py:get_quan_he_hinh_hoc",
+  "source": "deterministic local rule layer",
   "relations": {
     "xung_chieu": {
       "label": "Xung Chiếu",
@@ -17,10 +17,24 @@
       "ai_role": "Hai cung đồng nhóm tam hợp; dùng để tổng hợp nguồn lực, biểu hiện và hỗ trợ lẫn nhau giữa ba cung."
     },
     "nhi_hop": {
-      "label": "Nhị Hợp",
+      "label": "Nhị Hợp / Lục Hợp",
       "kind": "six_harmony",
-      "source": "LUC_HOP_MAP",
-      "ai_role": "Quan hệ lục hợp; dùng như lớp hỗ trợ/liên kết bổ sung giữa hai cung."
+      "deterministic": true,
+      "mapping_by_dia_chi": {
+        "Tý": "Sửu",
+        "Sửu": "Tý",
+        "Dần": "Hợi",
+        "Hợi": "Dần",
+        "Mão": "Tuất",
+        "Tuất": "Mão",
+        "Thìn": "Dậu",
+        "Dậu": "Thìn",
+        "Tỵ": "Thân",
+        "Thân": "Tỵ",
+        "Ngọ": "Mùi",
+        "Mùi": "Ngọ"
+      },
+      "ai_role": "Quan hệ lục hợp. Đối tượng Nhị Hợp phải lấy từ dữ liệu quan_he_cung/palace_relationships do engine Python tính theo Địa Chi; AI không được tự suy đoán theo vị trí giao diện hoặc thứ tự danh sách."
     },
     "giap_cung": {
       "label": "Giáp Cung",
@@ -55,6 +69,8 @@
   ],
   "anti_hallucination": [
     "Chỉ sử dụng quan hệ đã có trong chart JSON hoặc tính đúng theo quy tắc đã định nghĩa.",
+    "Nhị Hợp phải lấy theo cặp Địa Chi cố định trong mapping_by_dia_chi.",
+    "Không được thay đổi cung Nhị Hợp vì vị trí hiển thị, thứ tự 12 cung hoặc suy luận ngôn ngữ tự nhiên.",
     "Không suy diễn một Cách Cục chỉ từ tên sao nếu conditions của Cách Cục không được thỏa.",
     "Quan hệ cung là dữ liệu cấu trúc; ý nghĩa luận giải là lớp diễn giải riêng của AI."
   ]
