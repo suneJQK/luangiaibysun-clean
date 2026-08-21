@@ -18,21 +18,29 @@ STAR_ELEMENTS = {
 }
 
 THEME_CSS = r'''
-.star-element{font-weight:850!important}
-.star-element.moc{color:#54d477!important;border-color:#2f7d45!important;background:rgba(43,132,70,.16)!important}
-.star-element.hoa{color:#ff6868!important;border-color:#9b3d3d!important;background:rgba(180,52,52,.16)!important}
-.star-element.tho{color:#e6bd68!important;border-color:#8d713b!important;background:rgba(173,128,45,.16)!important}
-.star-element.kim{color:#edf2f8!important;border-color:#748091!important;background:rgba(205,214,226,.15)!important}
-.star-element.thuy{color:#5aa9ff!important;border-color:#356fa7!important;background:rgba(47,115,190,.16)!important}
+/* Ngũ hành có độ ưu tiên cao hơn màu Chính tinh/Hung tinh cũ. */
+#board .chip.star-element,#detail .chip.star-element{font-weight:850!important;background:#172640!important}
+#board .chip.star-element.nh-moc,#detail .chip.star-element.nh-moc{color:#54d477!important;border-color:#2f7d45!important;background:rgba(43,132,70,.16)!important}
+#board .chip.star-element.nh-hoa,#detail .chip.star-element.nh-hoa{color:#ff6868!important;border-color:#9b3d3d!important;background:rgba(180,52,52,.16)!important}
+#board .chip.star-element.nh-tho,#detail .chip.star-element.nh-tho{color:#e6bd68!important;border-color:#8d713b!important;background:rgba(173,128,45,.16)!important}
+#board .chip.star-element.nh-kim,#detail .chip.star-element.nh-kim{color:#edf2f8!important;border-color:#748091!important;background:rgba(205,214,226,.15)!important}
+#board .chip.star-element.nh-thuy,#detail .chip.star-element.nh-thuy{color:#5aa9ff!important;border-color:#356fa7!important;background:rgba(47,115,190,.16)!important}
 .ngu-hanh-legend{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;font-size:9px;color:#93a0b6}
 .nh-item{padding:2px 7px;border-radius:999px;border:1px solid #30435f;font-weight:750}
 .nh-moc{color:#54d477;border-color:#2f7d45}.nh-hoa{color:#ff6868;border-color:#9b3d3d}.nh-tho{color:#e6bd68;border-color:#8d713b}.nh-kim{color:#edf2f8;border-color:#748091}.nh-thuy{color:#5aa9ff;border-color:#356fa7}
 '''
 
-THEME_JS = """
+THEME_JS = r"""
 (() => {
   const STAR_ELEMENTS = %r;
-  const normalize = v => String(v ?? '').trim().replace(/\\s+/g,' ').toLowerCase();
+  const COLORS = {
+    moc:  {color:'#54d477', border:'#2f7d45', bg:'rgba(43,132,70,.16)'},
+    hoa:  {color:'#ff6868', border:'#9b3d3d', bg:'rgba(180,52,52,.16)'},
+    tho:  {color:'#e6bd68', border:'#8d713b', bg:'rgba(173,128,45,.16)'},
+    kim:  {color:'#edf2f8', border:'#748091', bg:'rgba(205,214,226,.15)'},
+    thuy: {color:'#5aa9ff', border:'#356fa7', bg:'rgba(47,115,190,.16)'}
+  };
+  const normalize = v => String(v ?? '').trim().replace(/\s+/g,' ').toLowerCase();
   const elementOf = name => {
     const s = String(name ?? '').trim();
     if (STAR_ELEMENTS[s]) return STAR_ELEMENTS[s];
@@ -41,10 +49,17 @@ THEME_JS = """
   };
   function colorizeStars(){
     document.querySelectorAll('#board .chip, #detail .chip').forEach(el => {
-      const nh = elementOf(String(el.textContent || '').split(' [')[0].trim());
-      if (!nh) return;
-      el.classList.remove('moc','hoa','tho','kim','thuy');
-      el.classList.add('star-element', nh);
+      const name = String(el.textContent || '').split(' [')[0].trim();
+      const nh = elementOf(name);
+      if (!nh || !COLORS[nh]) return;
+      const c = COLORS[nh];
+      el.classList.remove('main','bad','moc','hoa','tho','kim','thuy');
+      el.classList.add('star-element','nh-'+nh);
+      el.dataset.nguHanh = nh;
+      el.dataset.starName = name;
+      el.style.setProperty('color', c.color, 'important');
+      el.style.setProperty('border-color', c.border, 'important');
+      el.style.setProperty('background', c.bg, 'important');
     });
   }
   function addLegend(){
@@ -53,12 +68,12 @@ THEME_JS = """
     legend.dataset.nhLegend='1';
     legend.insertAdjacentHTML('afterend','<div class="ngu-hanh-legend"><span class="nh-item nh-moc">Mộc</span><span class="nh-item nh-hoa">Hỏa</span><span class="nh-item nh-tho">Thổ</span><span class="nh-item nh-kim">Kim</span><span class="nh-item nh-thuy">Thủy</span></div>');
   }
-  const r=window.render;
-  if(typeof r==='function') window.render=function(){const x=r.apply(this,arguments);addLegend();colorizeStars();return x};
-  const d=window.showDetail;
-  if(typeof d==='function') window.showDetail=function(){const x=d.apply(this,arguments);colorizeStars();return x};
-  new MutationObserver(colorizeStars).observe(document.body,{subtree:true,childList:true});
-  addLegend();colorizeStars();
+  const originalRender=window.render;
+  if(typeof originalRender==='function') window.render=function(){const r=originalRender.apply(this,arguments);setTimeout(()=>{addLegend();colorizeStars()},0);return r};
+  const originalDetail=window.showDetail;
+  if(typeof originalDetail==='function') window.showDetail=function(){const r=originalDetail.apply(this,arguments);setTimeout(colorizeStars,0);return r};
+  if(document.body) new MutationObserver(colorizeStars).observe(document.body,{subtree:true,childList:true});
+  if(document.readyState!=='loading'){addLegend();colorizeStars()}else document.addEventListener('DOMContentLoaded',()=>{addLegend();colorizeStars()});
 })();
 """ % STAR_ELEMENTS
 
