@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   patch:
-    if: github.event_name != 'push' || github.event.head_commit.message != 'fix: unify all Cach Cuc display'
+    if: github.event_name != 'push' || github.event.head_commit.message != 'fix: display all Cach Cuc without good bad split'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -34,10 +34,12 @@ jobs:
           text = p.read_text(encoding='utf-8')
 
           old_layout = '<section id="cach" class="pane"><div class="split"><div class="panel card"><h3>Cách Cục đã match</h3><div id="cachList"></div></div><div class="panel card"><h3>Cách Cục Phá/Giảm</h3><div id="modList"></div></div></div></section>'
-          new_layout = '<section id="cach" class="pane"><div class="panel card cach-panel"><div class="section-title"><h3>Cách Cục</h3><small>Toàn bộ Cách Cục và các yếu tố Phá/Giảm hiển thị chung</small></div><div id="cachList"></div></div></section>'
+          unified_layout = '<section id="cach" class="pane"><div class="panel card cach-panel"><div class="section-title"><h3>Cách Cục</h3><small>Tất cả Cách Cục được engine xác định</small></div><div id="cachList"></div></div></section>'
 
-          old_css_anchor = '.db,.cach{padding:9px;border:1px solid var(--line);border-radius:9px;background:#09111e}.db h4,.cach h4{margin:0 0 5px}'
-          new_css_anchor = '.db,.cach{padding:9px;border:1px solid var(--line);border-radius:9px;background:#09111e}.db h4,.cach h4{margin:0 0 5px}.cach-panel #cachList{display:grid;gap:10px;margin-top:10px}.cach-item{padding:11px;border:1px solid var(--line);border-radius:10px;background:#09111e}.cach-item.core{border-left:3px solid var(--gold)}.cach-item.modifier{border-left:3px solid #d56a6a}.cach-item h4{margin:0 0 6px}.cach-meta{display:flex;gap:6px;flex-wrap:wrap;margin:5px 0}.cach-tag{display:inline-flex;align-items:center;padding:2px 8px;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:11px}.cach-evidence{margin-top:7px;color:#c8d3e6;font-size:12px}.cach-list-empty{padding:12px;border:1px dashed var(--line);border-radius:10px;color:var(--muted)}'
+          old_unified_layout = '<section id="cach" class="pane"><div class="panel card cach-panel"><div class="section-title"><h3>Cách Cục</h3><small>Toàn bộ Cách Cục và các yếu tố Phá/Giảm hiển thị chung</small></div><div id="cachList"></div></div></section>'
+
+          old_css = '.db,.cach{padding:9px;border:1px solid var(--line);border-radius:9px;background:#09111e}.db h4,.cach h4{margin:0 0 5px}'
+          new_css = '.db,.cach{padding:9px;border:1px solid var(--line);border-radius:9px;background:#09111e}.db h4,.cach h4{margin:0 0 5px}.cach-panel #cachList{display:grid;gap:10px;margin-top:10px}.cach-item{padding:11px;border:1px solid var(--line);border-radius:10px;background:#09111e}.cach-item h4{margin:0 0 6px}.cach-evidence{margin-top:7px;color:#c8d3e6;font-size:12px}.cach-list-empty{padding:12px;border:1px dashed var(--line);border-radius:10px;color:var(--muted)}'
 
           old_render = '''function renderCach(){
   const matched=Array.isArray(chart?.cach_cuc_analysis?.matched)?chart.cach_cuc_analysis.matched:[];
@@ -46,7 +48,7 @@ jobs:
   $('modList').innerHTML=locPhungXungPha?`<div class="cach"><h4>Lộc Phùng Xung Phá</h4><p>${esc(locPhungXungPha.description||locPhungXungPha.reason||'Cách Cục phá đã được xác định.')}</p></div>`:'<div class="msg">Không có</div>';
 }'''
 
-          new_render = '''function renderCach(){
+          old_render_unified = '''function renderCach(){
   const analysis=chart?.cach_cuc_analysis||{};
   const matched=Array.isArray(analysis.matched)?analysis.matched:[];
   const modifiers=Array.isArray(analysis.modifiers)?analysis.modifiers:[];
@@ -81,23 +83,46 @@ jobs:
   if(mod) mod.innerHTML='';
 }'''
 
+          new_render = '''function renderCach(){
+  const matched=Array.isArray(chart?.cach_cuc_analysis?.matched)?chart.cach_cuc_analysis.matched:[];
+  $('cachList').innerHTML=matched.length?matched.map(x=>{
+    if(!x||typeof x!=='object') return '';
+    const evidence=Array.isArray(x.matched_branches)?x.matched_branches:[];
+    const evidenceText=evidence.map(ev=>{
+      const relation=ev?.relation||ev?.relationship||'';
+      const palace=ev?.palace?.cung||ev?.palace?.dia_chi||ev?.cung||ev?.dia_chi||'';
+      const stars=Array.isArray(ev?.stars)?ev.stars.join(', '):(ev?.star||'');
+      return [relation,palace,stars].filter(Boolean).join(' · ');
+    }).filter(Boolean).join(' | ');
+    return `<div class="cach-item"><h4>${esc(x.name||'Cách Cục')}</h4><p>${esc(x.description||x.reason||'')}</p>${evidenceText?`<div class="cach-evidence"><b>Bằng chứng:</b> ${esc(evidenceText)}</div>`:''}</div>`;
+  }).join(''):'<div class="cach-list-empty">Chưa có Cách Cục match.</div>';
+}'''
+
           changed = False
           if old_layout in text:
-              text = text.replace(old_layout, new_layout, 1)
+              text = text.replace(old_layout, unified_layout, 1)
               changed = True
-          if old_css_anchor in text and new_css_anchor not in text:
-              text = text.replace(old_css_anchor, new_css_anchor, 1)
+          elif old_unified_layout in text:
+              text = text.replace(old_unified_layout, unified_layout, 1)
               changed = True
+
+          if old_css in text and new_css not in text:
+              text = text.replace(old_css, new_css, 1)
+              changed = True
+
           if old_render in text:
               text = text.replace(old_render, new_render, 1)
               changed = True
+          elif old_render_unified in text:
+              text = text.replace(old_render_unified, new_render, 1)
+              changed = True
 
           if not changed:
-              print('index.html already unified or no recognized patch needed')
+              print('index.html already uses unified all-Cach-Cuc display')
               raise SystemExit(0)
 
           p.write_text(text, encoding='utf-8')
-          print('index.html unified Cách Cục display: PASS')
+          print('index.html all-Cach-Cuc display: PASS')
 
       - name: Verify patch
         shell: python
@@ -108,13 +133,21 @@ jobs:
               '<section id="cach" class="pane"><div class="panel card cach-panel">',
               'id="cachList"',
               'function renderCach(){',
+              'cach-item',
+          ]
+          forbidden = [
+              '<h3>Cách Cục Phá/Giảm</h3>',
               'analysis.modifiers',
               'cach-item modifier',
+              'Lộc Phùng Xung Phá',
           ]
           missing = [x for x in required if x not in text]
+          present_forbidden = [x for x in forbidden if x in text]
           if missing:
-              raise SystemExit(f'Unified Cách Cục verification failed: {missing}')
-          print('Unified Cách Cục verification: PASS')
+              raise SystemExit(f'All Cách Cục verification failed: {missing}')
+          if present_forbidden:
+              raise SystemExit(f'Forbidden good/bad or modifier display found: {present_forbidden}')
+          print('All Cách Cục verification: PASS')
 
       - name: Commit patched index
         shell: bash
@@ -126,5 +159,5 @@ jobs:
             echo 'No changes required.'
             exit 0
           fi
-          git commit -m 'fix: unify all Cach Cuc display'
+          git commit -m 'fix: display all Cach Cuc without good bad split'
           git push
