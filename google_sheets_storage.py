@@ -49,8 +49,25 @@ def _text(value: Any, default: str = "—") -> str:
 
 
 def _birth_date_text(value: str) -> str:
-    """Normalize birth date to explicit text such as 11/11/1996."""
+    """Store the birth date as literal text, never as a Sheets date serial."""
     return _text(value)
+
+
+def _normalize(value: Any) -> str:
+    return str(value or "").strip().casefold()
+
+
+def _profile_match(row: list[Any], *, birth_date: str, birth_time: str, gender: str, calendar: str, time_zone: str) -> bool:
+    """Identify the same birth profile even when an old random/legacy ID exists."""
+    if len(row) < 8:
+        return False
+    return (
+        _normalize(row[2]) == _normalize(birth_date)
+        and _normalize(row[3]) == _normalize(birth_time)
+        and _normalize(row[4]) == _normalize(gender)
+        and _normalize(row[5]) == _normalize(calendar)
+        and _normalize(row[6]) == _normalize(time_zone)
+    )
 
 
 def save_user_profile(*, user_id: str, name: str, ngay_sinh: str, gio_sinh: str, gioi_tinh: str, lich: str, time_zone: float, created_at: str) -> dict[str, Any]:
@@ -68,20 +85,41 @@ def save_user_profile(*, user_id: str, name: str, ngay_sinh: str, gio_sinh: str,
         ).execute()
 
     stable_id = _text(user_id)
-    row = [
-        stable_id,
-        _text(name),
-        _birth_date_text(ngay_sinh),
-        _text(gio_sinh),
-        _text(gioi_tinh),
-        _text(lich),
-        _text(time_zone),
-        _text(created_at),
-    ]
+    clean_name = _text(name)
+    birth_date = _birth_date_text(ngay_sinh)
+    birth_time = _text(gio_sinh)
+    gender = _text(gioi_tinh)
+    calendar = _text(lich)
+    tz = _text(time_zone)
+    created = _text(created_at)
+    row = [stable_id, clean_name, birth_date, birth_time, gender, calendar, tz, created]
 
-    # Upsert by ID: do not create a new row every time the same chart is opened.
-    existing = values_api.get(spreadsheetId=spreadsheet_id, range="A2:A").execute().get("values", [])
-    row_number = next((idx + 2 for idx, values in enumerate(existing) if values and str(values[0]).strip() == stable_id), None)
+    existing = values_api.get(spreadsheetId=spreadsheet_id, range="A2:H").execute().get("values", [])
+
+    # First preference: exact stable ID.
+    row_number = next(
+        (idx + 2 for idx, values in enumerate(existing) if values and _normalize(values[0]) == _normalize(stable_id)),
+        None,
+    )
+
+    # Migration fallback: find a legacy row with the same birth profile even if its ID was random.
+    if row_number is None:
+        row_number = next(
+            (
+                idx + 2
+                for idx, values in enumerate(existing)
+                if _profile_match(
+                    values,
+                    birth_date=birth_date,
+                    birth_time=birth_time,
+                    gender=gender,
+                    calendar=calendar,
+                    time_zone=tz,
+                )
+            ),
+            None,
+        )
+
     if row_number is not None:
         result = values_api.update(
             spreadsheetId=spreadsheet_id,
@@ -89,7 +127,13 @@ def save_user_profile(*, user_id: str, name: str, ngay_sinh: str, gio_sinh: str,
             valueInputOption="RAW",
             body={"values": [row]},
         ).execute()
-        return {"saved": True, "action": "updated", "row": row_number, "updated_range": result.get("updatedRange")}
+        return {
+            "saved": True,
+            "action": "updated",
+            "row": row_number,
+            "profile_id": stable_id,
+            "updated_range": result.get("updatedRange"),
+        }
 
     result = values_api.append(
         spreadsheetId=spreadsheet_id,
@@ -98,4 +142,9 @@ def save_user_profile(*, user_id: str, name: str, ngay_sinh: str, gio_sinh: str,
         insertDataOption="INSERT_ROWS",
         body={"values": [row]},
     ).execute()
-    return {"saved": True, "action": "created", "updated_range": result.get("updates", {}).get("updatedRange")}
+    return {
+        "saved": True,
+        "action": "created",
+        "profile_id": stable_id,
+        "updated_range": result.get("updates", {}).get("updatedRange"),
+    }
