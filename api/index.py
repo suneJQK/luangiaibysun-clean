@@ -141,7 +141,7 @@ def _inject_viewing_year_ui(html: str) -> str:
   const currentYear=new Date().getFullYear(), MIN_YEAR=1800, MAX_YEAR=2200;
   const byId=id=>document.getElementById(id);
   const normalizeYear=value=>{const n=Number(value); if(!Number.isFinite(n)) return currentYear; return Math.min(MAX_YEAR,Math.max(MIN_YEAR,Math.trunc(n)));};
-  const esc=v=>String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const esc=v=>String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;');
   const BRANCH_NAMES={1:'Tý',2:'Sửu',3:'Dần',4:'Mão',5:'Thìn',6:'Tỵ',7:'Ngọ',8:'Mùi',9:'Thân',10:'Dậu',11:'Tuất',12:'Hợi',ty1:'Tý',ty2:'Tỵ',ty:'Tý',suu:'Sửu',dan:'Dần',mao:'Mão',thin:'Thìn',ngo:'Ngọ',mui:'Mùi',than:'Thân',dau:'Dậu',tuat:'Tuất',hoi:'Hợi'};
   const branchName=value=>{
     if(value==null) return '';
@@ -163,36 +163,49 @@ def _inject_viewing_year_ui(html: str) -> str:
     const canChi=x.can_chi || '';
     return '<b>'+esc(name)+'</b>'+(branch?' <span class="luck-branch">('+esc(branch)+(canChi?' · '+esc(canChi):'')+')</span>':'');
   };
+  const normalizeText=v=>String(v??'').replace(/\s+/g,' ').trim().toLowerCase();
+  const syncModifierPanel=()=>{
+    const mod=byId('modList');
+    const cach=byId('cachList');
+    if(!mod) return;
+    const card=mod.closest('.panel.card') || mod.parentElement;
+    const cachNames=new Set();
+    if(cach){
+      cach.querySelectorAll('*').forEach(el=>{if(el.children.length===0){const t=normalizeText(el.textContent);if(t)cachNames.add(t);}});
+    }
+    const seen=new Set();
+    [...mod.children].forEach(el=>{
+      const key=normalizeText(el.textContent);
+      if(!key) return;
+      if(seen.has(key) || cachNames.has(key)) el.remove();
+      else seen.add(key);
+    });
+    const text=normalizeText(mod.textContent);
+    const empty=!text || /^(không có|không có modifier|chưa có|none|n\/a|—|-)$/.test(text);
+    if(card) card.style.display=empty?'none':'';
+  };
+  const observeModifierPanel=()=>{
+    const mod=byId('modList');
+    if(!mod) return;
+    syncModifierPanel();
+    new MutationObserver(()=>syncModifierPanel()).observe(mod,{childList:true,subtree:true,characterData:true});
+  };
   window.renderVan10=function(chart){
     const root=byId('van10Panel');
     if(!root) return;
     const van=chart?.van||{};
     const dvBase=(van.dai_van_10_nam && typeof van.dai_van_10_nam==='object' && !Array.isArray(van.dai_van_10_nam)) ? van.dai_van_10_nam : {};
-    const lndv=luckList(van);
-    const tv=smallList(van);
-    const lnn=yearList(van);
-    const rows=[];
+    const lndv=luckList(van), tv=smallList(van), lnn=yearList(van), rows=[];
     for(let i=0;i<10;i++){
       const b=lndv[i]||{}, c=tv[i]||{}, d=lnn[i]||{};
-      const year=b.nam ?? c.nam ?? d.nam ?? (i+1);
-      const tuoi=b.tuoi ?? c.tuoi ?? d.tuoi ?? '—';
+      const year=b.nam ?? c.nam ?? d.nam ?? (i+1), tuoi=b.tuoi ?? c.tuoi ?? d.tuoi ?? '—';
       if(year==null) continue;
       const a={...dvBase,nam:year,tuoi:tuoi};
-      rows.push('<tr data-year="'+esc(year)+'" class="'+(Number(year)===Number(viewYear?.value)?'is-viewing':'')+'">'
-        +'<td><button type="button" class="year-pick" data-year="'+esc(year)+'">'+esc(year)+'</button></td>'
-        +'<td>'+esc(tuoi)+'</td>'
-        +'<td>'+compactCell(a)+'</td>'
-        +'<td>'+compactCell(b)+'</td>'
-        +'<td>'+compactCell(c)+'</td>'
-        +'<td>'+compactCell(d)+'</td>'
-        +'</tr>');
+      rows.push('<tr data-year="'+esc(year)+'" class="'+(Number(year)===Number(viewYear?.value)?'is-viewing':'')+'"><td><button type="button" class="year-pick" data-year="'+esc(year)+'">'+esc(year)+'</button></td><td>'+esc(tuoi)+'</td><td>'+compactCell(a)+'</td><td>'+compactCell(b)+'</td><td>'+compactCell(c)+'</td><td>'+compactCell(d)+'</td></tr>');
     }
-    root.innerHTML='<div class="panel card luck10-card">'
-      +'<div class="section-title"><h3>Vận 10 năm</h3><small>4 lớp vận hạn độc lập</small></div>'
-      +'<div class="luck10-note">📌 Các năm dưới đây là các năm có thể chọn để đặt câu hỏi cho AI. Chọn đúng năm để AI luận Đại vận, Lưu niên Đại vận, Tiểu vận và Lưu niên năm của năm đó.</div>'
-      +'<div class="luck10-wrap"><table class="luck10"><thead><tr><th>Năm</th><th>Tuổi</th><th>Đại vận</th><th>Lưu niên Đại vận</th><th>Tiểu vận</th><th>Lưu niên năm</th></tr></thead><tbody>'+(rows.join('')||'<tr><td colspan="6">Engine chưa trả dữ liệu 10 năm.</td></tr>')+'</tbody></table></div>'
-      +'</div>';
+    root.innerHTML='<div class="panel card luck10-card"><div class="section-title"><h3>Vận 10 năm</h3><small>4 lớp vận hạn độc lập</small></div><div class="luck10-note">📌 Các năm dưới đây là các năm có thể chọn để đặt câu hỏi cho AI. Chọn đúng năm để AI luận Đại vận, Lưu niên Đại vận, Tiểu vận và Lưu niên năm của năm đó.</div><div class="luck10-wrap"><table class="luck10"><thead><tr><th>Năm</th><th>Tuổi</th><th>Đại vận</th><th>Lưu niên Đại vận</th><th>Tiểu vận</th><th>Lưu niên năm</th></tr></thead><tbody>'+(rows.join('')||'<tr><td colspan="6">Engine chưa trả dữ liệu 10 năm.</td></tr>')+'</tbody></table></div></div>';
     root.querySelectorAll('.year-pick').forEach(btn=>btn.addEventListener('click',()=>{const y=normalizeYear(btn.dataset.year);setViewYear(y);window.lapSo?.();}));
+    observeModifierPanel();
   };
   try{
     const oldLoad=window.loadUserProfile;
