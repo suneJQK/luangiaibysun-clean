@@ -54,6 +54,10 @@
     return Array.isArray(value) ? value.map(s => s?.ten ?? s?.name ?? s).join(', ') || '—' : text(value);
   };
 
+  const escapeHtml = (value) => String(value ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
   const compact = (item) => {
     const name = palace(item);
     const b = branch(item);
@@ -61,10 +65,6 @@
     const st = stars(item);
     return `<b>${escapeHtml(name)}</b><span class="muted">${escapeHtml([b, cc].filter(x => x !== '—').join(' · ') || '—')}</span><span class="muted">${escapeHtml(st)}</span>`;
   };
-
-  const escapeHtml = (value) => String(value ?? '')
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
   function renderVan10(chart) {
     const host = $('van10Panel');
@@ -107,9 +107,13 @@
 
   function renderFromJson() {
     try {
+      const host = $('van10Panel');
       if (!jsonBox) return;
       const raw = jsonBox.textContent.trim();
-      if (!raw || raw === 'Chưa có dữ liệu.') return;
+      if (!raw || raw === 'Chưa có dữ liệu.') {
+        if (host) host.innerHTML = '';
+        return;
+      }
       const chart = JSON.parse(raw);
       renderVan10(chart);
     } catch (_) {}
