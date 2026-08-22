@@ -9,6 +9,8 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
+from .data_loader import load_json
+
 DYNAMIC_FIELDS = {
     "dai_van", "tieu_van", "luu_nien", "luu_dai_van", "luu_nguyet",
     "luu_nhat", "luu_thoi"
@@ -16,6 +18,7 @@ DYNAMIC_FIELDS = {
 BRANCHES = ["Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi", "Thân", "Dậu", "Tuất", "Hợi"]
 TAM_HOP = [frozenset(x) for x in (("Thân", "Tý", "Thìn"), ("Dần", "Ngọ", "Tuất"), ("Tỵ", "Dậu", "Sửu"), ("Hợi", "Mão", "Mùi"))]
 NHI_HOP = {"Tý":"Sửu","Sửu":"Tý","Dần":"Hợi","Hợi":"Dần","Mão":"Tuất","Tuất":"Mão","Thìn":"Dậu","Dậu":"Thìn","Tỵ":"Thân","Thân":"Tỵ","Ngọ":"Mùi","Mùi":"Ngọ"}
+_RELATION_DATA = load_json("data/relationships_ai.json")
 
 
 def _norm_branch(value: Any) -> str | None:
