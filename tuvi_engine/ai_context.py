@@ -20,7 +20,8 @@ def _index_cach_cuc(items: list[dict[str, Any]]) -> dict[int, dict[str, Any]]:
 
 def _normalize_matched_cach_cuc(chart: dict[str, Any], catalog: list[dict[str, Any]]) -> list[dict[str, Any]]:
     index = _index_cach_cuc(catalog)
-    matched = chart.get("cach_cuc", [])
+    analysis = chart.get("cach_cuc_analysis") if isinstance(chart.get("cach_cuc_analysis"), dict) else {}
+    matched = analysis.get("matched") if isinstance(analysis.get("matched"), list) else chart.get("cach_cuc", [])
     result: list[dict[str, Any]] = []
     if not isinstance(matched, list):
         return result
@@ -44,7 +45,6 @@ def _normalize_matched_cach_cuc(chart: dict[str, Any], catalog: list[dict[str, A
 
 def _question_scope(question: str) -> dict[str, Any]:
     q = (question or "").strip().casefold()
-    # More-specific scopes must be checked before the generic "Đại vận" match.
     if any(x in q for x in ("lưu niên đại vận", "lưu đại hạn", "lưu đại vận")):
         return {"id": "luu_nien_dai_van", "focus": "luu_nien_dai_van", "weights": {"dai_van": 0.25, "luu_nien_dai_van": 0.50, "tieu_van": 0.10, "luu_nien_nam": 0.15}}
     if any(x in q for x in ("tiểu hạn", "tiểu vận")):
@@ -72,13 +72,8 @@ def build_ai_context(
     matched_cach_cuc = _normalize_matched_cach_cuc(chart, cach_cuc_catalog)
     modifiers = deepcopy(chart.get("cach_cuc_modifiers", [])) if isinstance(chart.get("cach_cuc_modifiers", []), list) else []
     context: dict[str, Any] = {
-        "schema_version": "3.3-ai-context-filtered-four-layer-authoritative-cach-cuc",
+        "schema_version": "3.4-ai-context-authoritative-cach-cuc-no-truncation",
         "input": deepcopy(chart.get("input", {})),
-        "thien_ban": deepcopy(chart.get("thien_ban", {})),
-        "palaces": deepcopy(filtered.get("selected_palaces", {})),
-        "ai_payload": filtered,
-        "relationship_knowledge": load_relationship_knowledge(),
-        "matched_cach_cuc": matched_cach_cuc,
         "confirmed_cach_cuc": {
             "count": len(matched_cach_cuc),
             "items": matched_cach_cuc,
@@ -94,6 +89,11 @@ def build_ai_context(
             "display_with_cach_cuc": True,
             "allow_ai_invented_names": False,
         },
+        "thien_ban": deepcopy(chart.get("thien_ban", {})),
+        "palaces": deepcopy(filtered.get("selected_palaces", {})),
+        "ai_payload": filtered,
+        "relationship_knowledge": load_relationship_knowledge(),
+        "matched_cach_cuc": matched_cach_cuc,
         "question_scope": scope,
         "reasoning_contract": {
             "ai_payload_source_of_truth": "ai_payload",
