@@ -24,25 +24,11 @@ from typing import Any, Callable
 
 BRANCHES = ["Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi", "Thân", "Dậu", "Tuất", "Hợi"]
 
-# Cung khởi được quy định theo 4 nhóm Tam hợp của Chi năm sinh.
-# Dùng tên Chi thay vì số để tránh nhầm thứ tự/ánh xạ.
 START_BRANCH_BY_BIRTH_BRANCH = {
-    # Thân – Tý – Thìn
-    "Tý": "Tuất",
-    "Thìn": "Tuất",
-    "Thân": "Tuất",
-    # Tỵ – Dậu – Sửu
-    "Tỵ": "Mùi",
-    "Dậu": "Mùi",
-    "Sửu": "Mùi",
-    # Dần – Ngọ – Tuất
-    "Dần": "Thìn",
-    "Ngọ": "Thìn",
-    "Tuất": "Thìn",
-    # Hợi – Mão – Mùi
-    "Hợi": "Sửu",
-    "Mão": "Sửu",
-    "Mùi": "Sửu",
+    "Tý": "Tuất", "Thìn": "Tuất", "Thân": "Tuất",
+    "Tỵ": "Mùi", "Dậu": "Mùi", "Sửu": "Mùi",
+    "Dần": "Thìn", "Ngọ": "Thìn", "Tuất": "Thìn",
+    "Hợi": "Sửu", "Mão": "Sửu", "Mùi": "Sửu",
 }
 
 
@@ -78,19 +64,7 @@ def build_tieu_van_source_mapping(
     gender: str,
     age: int | None = None,
 ) -> dict[str, Any]:
-    """Tính vị trí Tiểu hạn theo cung khởi -> mốc Tý -> Chi năm xem.
-
-    Quy trình:
-      1. Xác định nhóm Tam hợp của Chi năm sinh.
-      2. Tra cung khởi của nhóm đó.
-      3. Quy ước cung khởi là Tý (mốc đếm = 0).
-      4. Lấy Chi năm xem làm chỉ tiêu cần tìm trong vòng 12 Chi, bắt đầu
-         từ Tý và đi theo chiều Nam/Nữ.
-      5. Cung thực tế tương ứng với Chi năm xem là cung Tiểu hạn/Tiểu vận.
-
-    ``age`` chỉ được giữ làm dữ liệu đối chiếu/hiển thị. Nó không quyết định
-    vị trí chính.
-    """
+    """Tính vị trí Tiểu hạn theo cung khởi -> mốc Tý -> Chi năm xem."""
     birth_branch = check_fn(birth_branch)
     target_branch = check_fn(target_branch)
 
@@ -103,13 +77,10 @@ def build_tieu_van_source_mapping(
     direction, direction_name = _gender_direction(gender)
     start_branch = branch_number(start_branch_name)
 
-    # Cung khởi được xem là Tý. Vì vậy index Chi của năm xem chính là số bước
-    # tính từ mốc Tý theo chiều Nam/Nữ.
     target_steps_from_ti = (target_branch - 1) % 12
     palace_branch = check_fn(start_branch + direction * target_steps_from_ti)
     palace_branch_name = chi_name_fn(palace_branch)
 
-    # Tạo bảng kiểm tra 12 bước: mỗi bước ghi Chi quy ước tại cung thực tế.
     sequence: list[dict[str, Any]] = []
     for step in range(12):
         mapped_year_branch = check_fn(1 + direction * step)
@@ -128,7 +99,9 @@ def build_tieu_van_source_mapping(
         "cung_dia_chi_ten": palace_branch_name,
         "cung_so": palace_branch,
         "chi_nam": target_branch,
-        "chi_ten": target_name,
+        # For display/compatibility, chi_ten is the Địa Chi of the actual
+        # Tiểu vận palace, not the Chi of the year being queried.
+        "chi_ten": palace_branch_name,
         "chi_nam_sinh": birth_branch,
         "chi_nam_sinh_ten": birth_name,
         "khoang_cach_chi": target_steps_from_ti,
