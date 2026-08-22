@@ -142,11 +142,11 @@ def _inject_viewing_year_ui(html: str) -> str:
   const byId=id=>document.getElementById(id);
   const normalizeYear=value=>{const n=Number(value); if(!Number.isFinite(n)) return currentYear; return Math.min(MAX_YEAR,Math.max(MIN_YEAR,Math.trunc(n)));};
   const esc=v=>String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  const BRANCH_NAMES={ty1:'Tý',ty2:'Tỵ',ty:'Tý',suu:'Sửu',dan:'Dần',mao:'Mão',thin:'Thìn',ngo:'Ngọ',mui:'Mùi',than:'Thân',dau:'Dậu',tuat:'Tuất',hoi:'Hợi'};
+  const BRANCH_NAMES={1:'Tý',2:'Sửu',3:'Dần',4:'Mão',5:'Thìn',6:'Tỵ',7:'Ngọ',8:'Mùi',9:'Thân',10:'Dậu',11:'Tuất',12:'Hợi',ty1:'Tý',ty2:'Tỵ',ty:'Tý',suu:'Sửu',dan:'Dần',mao:'Mão',thin:'Thìn',ngo:'Ngọ',mui:'Mùi',than:'Thân',dau:'Dậu',tuat:'Tuất',hoi:'Hợi'};
   const branchName=value=>{
     if(value==null) return '';
     const raw=String(value).trim();
-    return BRANCH_NAMES[raw.toLowerCase()] || raw;
+    return BRANCH_NAMES[raw.toLowerCase()] || BRANCH_NAMES[Number(raw)] || raw;
   };
   const viewYear=byId('viewYear');
   if(viewYear){viewYear.min=String(MIN_YEAR);viewYear.max=String(MAX_YEAR);viewYear.step='1';viewYear.value=normalizeYear(viewYear.value||currentYear);viewYear.addEventListener('change',()=>{viewYear.value=normalizeYear(viewYear.value);});}
@@ -159,7 +159,7 @@ def _inject_viewing_year_ui(html: str) -> str:
   const compactCell=x=>{
     if(!x || typeof x!=='object') return esc(x??'—');
     const name=palaceName(x);
-    const branch=branchName(x.dia_chi || x.chi_ten || x.chi);
+    const branch=branchName(x.chi_ten ?? x.dia_chi ?? x.chi);
     const canChi=x.can_chi || '';
     return '<b>'+esc(name)+'</b>'+(branch?' <span class="luck-branch">('+esc(branch)+(canChi?' · '+esc(canChi):'')+')</span>':'');
   };
