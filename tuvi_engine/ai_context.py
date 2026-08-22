@@ -1,24 +1,15 @@
-"""Build a compact, deterministic context payload for AI interpretation."""
+"""Build deterministic AI context and route it through the payload filter."""
 from __future__ import annotations
 
 from copy import deepcopy
 from typing import Any
 
+from .ai_payload_filter import build_filtered_ai_payload
 from .data_loader import load_cach_cuc, load_json
 
-
 _RELATION_DATA = load_json("data/relationships_ai.json")
-
-# Các lớp vận năm/tháng/ngày/giờ phải lấy từ `van` đã tính cho đúng năm xem.
-# Không cho AI đọc bản vận hạn tĩnh được an sẵn trong từng cung của lá số.
 _DYNAMIC_PALACE_FIELDS = {
-    "dai_van",
-    "tieu_van",
-    "luu_nien",
-    "luu_dai_van",
-    "luu_nguyet",
-    "luu_nhat",
-    "luu_thoi",
+    "dai_van", "tieu_van", "luu_nien", "luu_dai_van", "luu_nguyet", "luu_nhat", "luu_thoi"
 }
 
 
@@ -27,21 +18,15 @@ def load_relationship_knowledge() -> dict[str, Any]:
 
 
 def _index_cach_cuc(items: list[dict[str, Any]]) -> dict[int, dict[str, Any]]:
-    return {
-        int(item["id"]): item
-        for item in items
-        if isinstance(item, dict) and item.get("id") is not None
-    }
+    return {int(item["id"]): item for item in items if isinstance(item, dict) and item.get("id") is not None}
 
 
 def _normalize_matched_cach_cuc(chart: dict[str, Any], catalog: list[dict[str, Any]]) -> list[dict[str, Any]]:
     index = _index_cach_cuc(catalog)
     matched = chart.get("cach_cuc", [])
     result: list[dict[str, Any]] = []
-
     if not isinstance(matched, list):
         return result
-
     for item in matched:
         if isinstance(item, int) and item in index:
             result.append(deepcopy(index[item]))
@@ -53,16 +38,10 @@ def _normalize_matched_cach_cuc(chart: dict[str, Any], catalog: list[dict[str, A
                 result.append(base)
             else:
                 result.append(deepcopy(item))
-
     return result
 
 
 def _palaces_for_ai(chart: dict[str, Any]) -> dict[str, Any] | list[Any]:
-    """Return immutable natal palace facts only.
-
-    Dynamic vận layers are deliberately removed here. The authoritative
-    current-year result is attached separately as `van_han`.
-    """
     source = chart.get("12_cung", chart.get("dia_ban", {}))
     if isinstance(source, dict):
         result: dict[str, Any] = {}
@@ -92,34 +71,42 @@ def build_ai_context(
     chart: dict[str, Any],
     *,
     van: dict[str, Any] | None = None,
+    question: str = "",
 ) -> dict[str, Any]:
-    """Combine natal structure, authoritative vận layers, relationships and Cách Cục.
+    """Combine natal facts with the deterministic filtered payload.
 
-    The function never copies static `tieu_van`/`dai_van` fields from individual
-    palaces into the AI evidence set. Current vận data must come from `van`.
+    `ai_payload` is the preferred evidence set for the model. The complete
+    authoritative vận object remains under `van_han` for auditability.
     """
     if not isinstance(chart, dict):
         raise TypeError("chart phải là dict")
 
     cach_cuc_catalog = load_cach_cuc()
     context: dict[str, Any] = {
-        "schema_version": "2.1-ai-context-authoritative-van",
+        "schema_version": "3.0-ai-context-filtered-four-layer",
         "input": deepcopy(chart.get("input", {})),
         "thien_ban": deepcopy(chart.get("thien_ban", {})),
         "palaces": _palaces_for_ai(chart),
         "relationship_knowledge": load_relationship_knowledge(),
         "matched_cach_cuc": _normalize_matched_cach_cuc(chart, cach_cuc_catalog),
         "reasoning_contract": {
+            "ai_payload_source_of_truth": "ai_payload",
             "use_only_provided_relations": True,
             "use_only_matched_cach_cuc": True,
             "do_not_invent_missing_stars_or_relations": True,
             "separate_facts_from_interpretation": True,
             "dynamic_van_source_of_truth": "van_han",
             "never_read_static_tieu_van_from_palaces": True,
+            "four_han_layers_required_for_van_questions": True,
+            "tam_hop_must_include_all_three_palaces": True,
+            "name_each_influential_star_and_event": True,
         },
     }
     if van is not None:
         context["van_han"] = deepcopy(van)
+        context["ai_payload"] = build_filtered_ai_payload(chart, van, question)
+    else:
+        context["ai_payload"] = build_filtered_ai_payload(chart, {}, question)
     return context
 
 
