@@ -37,6 +37,55 @@ def chi_name(value: int) -> str:
     return CHI_NAMES[check(value)]
 
 
+def _normalize_branch_text(value: Any) -> str:
+    """Chuẩn hóa tên Địa Chi trong chart để mapping không phụ thuộc kiểu ghi."""
+    text = str(value or "").strip().casefold()
+    aliases = {
+        "tý": "ty", "ty": "ty", "ty1": "ty", "ty2": "ty",
+        "sửu": "suu", "suu": "suu",
+        "dần": "dan", "dan": "dan",
+        "mão": "mao", "mao": "mao",
+        "thìn": "thin", "thin": "thin",
+        "tỵ": "ty", "tị": "ty", "ti": "ty",
+        "ngọ": "ngo", "ngo": "ngo",
+        "mùi": "mui", "mui": "mui",
+        "thân": "than", "than": "than",
+        "dậu": "dau", "dau": "dau",
+        "tuất": "tuat", "tuat": "tuat",
+        "hợi": "hoi", "hoi": "hoi",
+    }
+    return aliases.get(text, text)
+
+
+def _branch_number_from_palace(palace: dict[str, Any]) -> int | None:
+    """Lấy số Chi từ cung, hỗ trợ cả tên chuẩn và key nội bộ ty1/ty2."""
+    raw = palace.get("dia_chi")
+    if isinstance(raw, int):
+        return check(raw)
+    normalized = _normalize_branch_text(raw)
+    branch_aliases = {
+        "ty": 1,
+        "suu": 2,
+        "dan": 3,
+        "mao": 4,
+        "thin": 5,
+        "ty2": 6,
+        "ngo": 7,
+        "mui": 8,
+        "than": 9,
+        "dau": 10,
+        "tuat": 11,
+        "hoi": 12,
+    }
+    # Nếu nguồn dùng ty1/ty2, cung có địa chi Tỵ phải ưu tiên ty2.
+    raw_text = str(raw or "").strip().casefold()
+    if raw_text in {"ty2", "tỵ", "tị"}:
+        return 6
+    if raw_text in {"ty1", "tý"}:
+        return 1
+    return branch_aliases.get(normalized)
+
+
 def _is_male(gender: str) -> bool:
     return str(gender).strip().casefold() in {"nam", "male", "m", "1"}
 
@@ -136,12 +185,32 @@ def _dv_direction(can_year: int | None, gender: str) -> int:
 
 
 def _palace_by_branch(chart: dict[str, Any], branch: int) -> int | None:
-    target = chi_name(branch)
+    """Tìm đúng cung có Địa Chi của năm/giờ/ngày/tháng.
+
+    Đây là mapping bắt buộc cho Lưu niên: năm 2026 = Bính Ngọ (Chi Ngọ=7)
+    thì Lưu niên phải nằm tại chính cung có Địa Chi Ngọ, không lấy cung Tiểu vận.
+    """
+    target = check(branch)
     for palace in chart.get("12_cung", {}).values():
-        if palace.get("dia_chi") == target:
+        palace_branch = _branch_number_from_palace(palace)
+        if palace_branch == target:
             value = palace.get("cung_so")
             if isinstance(value, int):
                 return value
+    return None
+
+
+def _palace_detail_by_branch(chart: dict[str, Any], branch: int) -> dict[str, Any] | None:
+    """Trả toàn bộ thông tin cung được kích hoạt bởi một Địa Chi."""
+    target = check(branch)
+    for palace in chart.get("12_cung", {}).values():
+        if _branch_number_from_palace(palace) == target:
+            return {
+                "cung_so": palace.get("cung_so"),
+                "cung": palace.get("cung"),
+                "dia_chi": palace.get("dia_chi"),
+                "can_chi": palace.get("can_chi"),
+            }
     return None
 
 
@@ -184,8 +253,6 @@ def _current_dai_van(chart: dict[str, Any], target_year: int) -> dict[str, Any] 
     direction = _dv_direction(can_year, gender)
     cung = int(current["cung_so"])
 
-    # Theo khối mã nguồn: Fl = cung Đại vận - 2; yl = checkcan(2*t + 1);
-    # Can Đại vận = checkcan(Fl + yl - 1).
     fl = check(cung - 2)
     yl = check_can(2 * (can_year or 1) + 1)
     dv_can = check_can(fl + yl - 1)
@@ -279,7 +346,6 @@ def _source_luu_dai_van_can(dv_can: int, cung_dv: int) -> list[dict[str, Any]]:
 def _valid_date(day: int, month: int, year: int) -> bool:
     if month < 1 or month > 12 or day < 1 or day > 31:
         return False
-    # Kiểm tra theo JDN bằng cách đổi ngược lại.
     jd = _jd_from_date(day, month, year)
     return _jd_to_gregorian(jd) == (day, month, year)
 
@@ -293,10 +359,7 @@ def calculate_van_layers(
     hour: int | None = None,
     time_zone: float | None = None,
 ) -> dict[str, Any]:
-    """Tính toàn bộ lớp vận hạn Tử Vi.
-
-    Không gọi, không phụ thuộc và không trả về bất kỳ kết quả Tứ Trụ nào.
-    """
+    """Tính toàn bộ lớp vận hạn Tử Vi."""
     inp = chart.get("input", {})
     birth_year = int(inp["nam"])
     birth_can = _birth_year_can(chart)
@@ -329,8 +392,11 @@ def calculate_van_layers(
             "can_12_cung": _source_luu_dai_van_can(int(dv["can"]), int(dv["cung_so"])),
         }
 
+    luu_nien_cung_so = _palace_by_branch(chart, year_branch)
+    luu_nien_cung_detail = _palace_detail_by_branch(chart, year_branch)
+
     result: dict[str, Any] = {
-        "algorithm_version": "tuvi-source-v4-no-tu-tru",
+        "algorithm_version": "tuvi-source-v5-luu-nien-chi-cung",
         "age": age,
         "direction": "thuận" if direction == 1 else "nghịch",
         "year": {
@@ -339,7 +405,7 @@ def calculate_van_layers(
             "can_ten": can_name(year_can),
             "chi": year_branch,
             "chi_ten": chi_name(year_branch),
-            "cung_luu_nien": _palace_by_branch(chart, year_branch),
+            "cung_luu_nien": luu_nien_cung_so,
         },
         "dai_van": {
             "huong": "thuận" if direction == 1 else "nghịch",
@@ -349,11 +415,16 @@ def calculate_van_layers(
         "luu_dai_van": luu_dai_van,
         "tieu_van": tieu_van,
         "luu_nien": {
-            "cung_nam": _palace_by_branch(chart, year_branch),
+            "nam": target_year,
+            "can_nam": year_can,
+            "can_nam_ten": can_name(year_can),
             "chi_nam": year_branch,
             "chi_nam_ten": chi_name(year_branch),
+            "cung_so": luu_nien_cung_so,
+            "cung_nam": luu_nien_cung_so,
+            "cung_detail": luu_nien_cung_detail,
             "cung_luu_nien_trong_dai_van": luu_nien_dv,
-            "phuong_phap": "Chi năm xem + lndv() trong Đại vận hiện hành",
+            "phuong_phap": "Lưu niên an trực tiếp tại cung có Địa Chi trùng Chi năm xem; ví dụ 2026 Bính Ngọ -> cung Ngọ.",
         },
     }
 
@@ -366,7 +437,6 @@ def calculate_van_layers(
     if day_int is not None and not _valid_date(day_int, month_int, target_year):
         raise ValueError("ngay_xem không hợp lệ")
 
-    # Lưu nguyệt: dùng Tiết khí tại chính ngày xem, không dùng tháng âm lịch thuần túy.
     solar_day = day_int if day_int is not None else 1
     tk = tiet_khi_month(solar_day, month_int, target_year, tz)
     month_can = check_can(2 * year_can + tk)
