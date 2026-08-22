@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#08111f">
+  <title>TV AI · Tử Vi Đẩu Số</title>
+  <link rel="stylesheet" href="./css/base.css">
+  <link rel="stylesheet" href="./css/layout.css">
+  <link rel="stylesheet" href="./css/components.css">
+  <link rel="stylesheet" href="./css/chart.css">
+  <link rel="stylesheet" href="./css/cach.css">
+  <link rel="stylesheet" href="./css/ai.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">☯</span><div><strong>TV AI</strong><small>Engine · Evidence · AI · Audit</small></div></div>
+      <section class="sidebar-section">
+        <div class="sidebar-title">HỒ SƠ</div>
+        <select id="profileSelect"><option value="">Hồ sơ mới</option></select>
+        <div class="profile-id" id="profileId">ID: —</div>
+        <label>Họ tên<input id="name"></label>
+        <div class="grid-2"><label>Ngày<input id="day" type="number" min="1" max="31" value="1"></label><label>Tháng<input id="month" type="number" min="1" max="12" value="1"></label></div>
+        <label>Năm sinh<input id="year" type="number" min="1800" max="2200" value="1996"></label>
+        <div class="grid-2"><label>Giờ<select id="hour"><option>Tý</option><option>Sửu</option><option>Dần</option><option>Mão</option><option>Thìn</option><option>Tỵ</option><option>Ngọ</option><option>Mùi</option><option>Thân</option><option>Dậu</option><option>Tuất</option><option>Hợi</option></select></label><label>Giới tính<select id="gender"><option>Nam</option><option>Nữ</option></select></label></div>
+        <div class="grid-2"><label>Lịch<select id="calendar"><option value="true">Dương lịch</option><option value="false">Âm lịch</option></select></label><label>Múi giờ<input id="tz" type="number" value="7"></label></div>
+        <label>Năm xem<input id="viewYear" type="number" min="1800" max="2200"></label>
+        <div class="button-row"><button id="calcBtn" class="btn primary">LẬP LÁ SỐ</button><button id="resetBtn" class="btn ghost">Xóa</button></div>
+        <div id="status" class="status"></div>
+      </section>
+      <section class="sidebar-section nav-section">
+        <div class="sidebar-title">ĐIỀU HƯỚNG</div>
+        <button class="nav active" data-view="chart">Thiên Bàn</button>
+        <button class="nav" data-view="cach">Cách Cục</button>
+        <button class="nav" data-view="relations">Quan hệ cung</button>
+        <button class="nav" data-view="van10">Vận 10 năm</button>
+        <button class="nav" data-view="ai">AI luận giải</button>
+        <button class="nav" data-view="audit">AI Audit</button>
+        <button class="nav" data-view="data">Dữ liệu</button>
+      </section>
+    </aside>
+
+    <main class="main">
+      <header class="topbar"><div><span class="eyebrow">TỬ VI ĐẨU SỐ</span><h1 id="pageTitle">Thiên Bàn & 12 Địa Bàn</h1><div class="status-strip"><span>ENGINE <b>V2</b></span><span>RULES <b id="ruleCount">—</b></span><span id="auditStatus">AUDIT READY</span></div></div></header>
+
+      <section id="view-chart" class="view active">
+        <div class="stats"><div><small>Cung Mệnh</small><strong id="sMenh">—</strong></div><div><small>Bản Mệnh</small><strong id="sBanMenh">—</strong></div><div><small>Mệnh Cục</small><strong id="sCuc">—</strong></div><div><small>Cách Cục</small><strong id="sCach">0</strong></div></div>
+        <div class="workspace"><section class="panel chart-panel"><div class="panel-head"><div><h2>Thiên Bàn & 12 Địa Bàn</h2><small>Chọn cung để xem chi tiết và quan hệ</small></div></div><div id="board" class="board"></div><div id="detail" class="detail hidden"></div></section><aside class="panel summary-panel"><h2>Thông tin lá số</h2><div id="summary">Chưa có dữ liệu.</div></aside></div>
+      </section>
+
+      <section id="view-cach" class="view"><div class="panel"><div class="panel-head"><div><h2>Cách Cục xác nhận từ Engine</h2><small>Chỉ hiển thị dữ liệu Engine trả về</small></div><strong id="cachCount">0</strong></div><div id="cachList" class="cach-list"><div class="empty">Chưa có dữ liệu.</div></div></div></section>
+      <section id="view-relations" class="view"><div class="panel"><div class="panel-head"><h2>Quan hệ cung</h2><small id="relationSubtitle">Chọn một cung trên Thiên Bàn</small></div><div id="relationPanel" class="relation-grid"><div class="empty">Chưa chọn cung.</div></div></div></section>
+      <section id="view-van10" class="view"><div class="panel"><div class="panel-head"><h2>Vận 10 năm</h2><small>Đại vận · Lưu niên Đại vận · Tiểu vận · Lưu niên năm</small></div><div class="table-scroll"><table class="luck-table"><thead><tr><th>Năm</th><th>Tuổi</th><th>Đại vận</th><th>Lưu niên Đại vận</th><th>Tiểu vận</th><th>Lưu niên năm</th></tr></thead><tbody id="van10Body"><tr><td colspan="6">Chưa có dữ liệu.</td></tr></tbody></table></div></div></section>
+      <section id="view-ai" class="view"><div class="ai-layout"><section class="panel ai-panel"><div class="panel-head"><div><h2>AI luận giải</h2><small>Bài luận có thanh cuộn riêng</small></div><button id="tocBtn" class="btn ghost">Mục lục</button></div><div id="chat" class="chat"><div class="msg assistant"><small>AI Tử Vi</small>Hãy lập lá số rồi đặt câu hỏi.</div></div><textarea id="question" placeholder="Nhập câu hỏi. Enter để gửi, Shift+Enter để xuống dòng."></textarea><button id="askBtn" class="btn primary">LUẬN GIẢI</button></section><aside class="panel"><h2>Dữ liệu AI</h2><div id="aiInfo">Chưa có lá số.</div><div id="aiSources"></div></aside></div></section>
+      <section id="view-audit" class="view"><div class="panel"><div class="panel-head"><div><h2>AI Evidence / Audit</h2><small>Đối chiếu bài luận với Engine</small></div><button id="runAuditBtn" class="btn ghost">Chạy Audit</button></div><div id="auditResult" class="empty">Chưa có bài luận.</div></div></section>
+      <section id="view-data" class="view"><div class="panel"><h2>Dữ liệu Engine</h2><pre id="jsonBox">Chưa có dữ liệu.</pre></div></section>
+    </main>
+  </div>
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>
