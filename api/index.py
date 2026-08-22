@@ -78,6 +78,30 @@ def _system_prompt() -> str:
     return "\n\n".join(x for x in parts if x) or "Bạn là chuyên gia Tử Vi Đẩu Số."
 
 
+def _available_ai_modes() -> list[dict[str, str]]:
+    modes: list[dict[str, str]] = []
+    if not AI_MODE_DIR.exists():
+        return modes
+    for path in sorted(AI_MODE_DIR.glob("*.txt")):
+        text = path.read_text(encoding="utf-8").strip()
+        first_line = next((x.strip() for x in text.splitlines() if x.strip()), "")
+        name = first_line.split(":", 1)[1].strip() if ":" in first_line else path.stem
+        modes.append({"id": path.stem, "name": name, "file": path.name})
+    return modes
+
+
+def _load_ai_mode(mode_id: str | None) -> tuple[str, str]:
+    modes = _available_ai_modes()
+    if not modes:
+        return "", "standard"
+    wanted = (mode_id or "standard").strip().lower()
+    path = AI_MODE_DIR / f"{wanted}.txt"
+    if not path.exists():
+        path = AI_MODE_DIR / f"{modes[0]['id']}.txt"
+        wanted = modes[0]["id"]
+    return path.read_text(encoding="utf-8").strip(), wanted
+
+
 def _compact(value: Any, limit: int = 90000) -> str:
     text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, separators=(",", ":"))
     return text if len(text) <= limit else text[:limit] + "..."
@@ -153,30 +177,221 @@ def _ai_context_for_request(chart: dict[str, Any], calc: dict[str, Any]) -> dict
     return context
 
 
-@app.post("/api/luan-giai")
-def luan_giai(req: AskRequest) -> dict[str, Any]:
-    try:
-        viewing_year = _view_year(req, req.year)
-        req.nam_xem = viewing_year
-        chart = _prepare_chart(req)
-        calc = calculate_chart(chart, **_view_args(req, viewing_year))
-        chart["van"] = calc.get("van", {})
-        chart.setdefault("viewing", {})["year"] = viewing_year
+def _inject_viewing_year_ui(html: str) -> str:
+    """Inject an explicit viewing-year control and synchronize it with every calculation/AI request."""
+    marker = '<div class="field"><label>Giới tính</label>'
+    year_field = (
+        '<div class="field view-year-field">'
+        '<label>Năm xem</label>'
+        '<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:5px">'
+        '<input id="viewYear" type="number" min="1800" max="2200" step="1" inputmode="numeric" aria-label="Năm xem">'
+        '<button type="button" class="btn secondary" id="viewYearPrev" title="Năm trước">−1</button>'
+        '<button type="button" class="btn secondary" id="viewYearNow" title="Năm hiện tại">Nay</button>'
+        '<button type="button" class="btn secondary" id="viewYearNext" title="Năm sau">+1</button>'
+        '</div>'
+        '<div class="field-help">Năm dùng để tính Đại vận/Lưu niên Đại vận/Tiểu vận/Lưu niên năm. Không phải năm sinh.</div>'
+        '</div>'
+    )
+    if 'id="viewYear"' not in html and marker in html:
+        html = html.replace(marker, year_field + marker, 1)
 
-        context = _ai_context_for_request(chart, calc)
-        mode_text, mode_id = _load_ai_mode(req.provider)
-        books = _load_json(BOOKS_FILE, [])
-        payload = {
-            "question": req.question,
-            "year": viewing_year,
-            "mode": mode_id,
-            "mode_prompt": mode_text,
-            "chart_context": context,
-            "books": books,
-        }
-        prompt = _compact(payload)
-        system = _system_prompt()
-        answer = generate_ai(system_instruction=system, prompt=prompt, provider=normalize_provider(req.provider))[0]
-        return {"answer": answer, "year": viewing_year, "mode": mode_id}
+    script = r'''
+<script>
+(function(){
+  const currentYear=new Date().getFullYear();
+  const MIN_YEAR=1800, MAX_YEAR=2200;
+  const byId=id=>document.getElementById(id);
+  const normalizeYear=value=>{
+    const n=Number(value);
+    if(!Number.isFinite(n)) return currentYear;
+    return Math.min(MAX_YEAR,Math.max(MIN_YEAR,Math.trunc(n)));
+  };
+  const viewYear=byId('viewYear');
+  if(viewYear){
+    viewYear.min=String(MIN_YEAR); viewYear.max=String(MAX_YEAR); viewYear.step='1';
+    viewYear.value=normalizeYear(viewYear.value||currentYear);
+    viewYear.addEventListener('change',()=>{viewYear.value=normalizeYear(viewYear.value);});
+  }
+  const setViewYear=y=>{if(viewYear){viewYear.value=normalizeYear(y);viewYear.dispatchEvent(new Event('change'));}};
+  byId('viewYearPrev')?.addEventListener('click',()=>setViewYear(Number(viewYear.value)-1));
+  byId('viewYearNow')?.addEventListener('click',()=>setViewYear(currentYear));
+  byId('viewYearNext')?.addEventListener('click',()=>setViewYear(Number(viewYear.value)+1));
+  try{
+    const oldLoad=window.loadUserProfile;
+    window.loadUserProfile=function(){
+      if(typeof oldLoad==='function') oldLoad();
+      const p=JSON.parse(localStorage.getItem('tvai_user_profile_v1')||'null');
+      if(p && p.viewYear!=null) setViewYear(p.viewYear);
+      else setViewYear(currentYear);
+    };
+    const oldSave=window.saveUserProfile;
+    window.saveUserProfile=function(){
+      if(typeof oldSave==='function') oldSave();
+      try{
+        const p=JSON.parse(localStorage.getItem('tvai_user_profile_v1')||'{}');
+        p.viewYear=normalizeYear(viewYear?.value||currentYear);
+        localStorage.setItem('tvai_user_profile_v1',JSON.stringify(p));
+      }catch{}
+    };
+  }catch{}
+
+  window.lapSo=async function(){
+    byId('status').innerHTML='<div class="msg">Đang lập lá số...</div>';
+    try{
+      window.saveUserProfile?.();
+      const viewingYear=normalizeYear(viewYear?.value||currentYear);
+      const d=await window.call('/api/lap-so',{method:'POST',body:JSON.stringify({
+        ngay:Number(byId('day').value),
+        thang:Number(byId('month').value),
+        nam:Number(byId('year').value),
+        nam_xem:viewingYear,
+        gio_sinh:byId('hour').value,
+        gioi_tinh:byId('gender').value,
+        ten:byId('name').value,
+        duong_lich:byId('calendar').value==='true',
+        time_zone:Number(byId('tz').value)
+      })});
+      window.render(d);
+      byId('status').innerHTML='<div class="msg">Đã lập lá số · Năm xem: '+window.esc(viewingYear)+'</div>';
+    }catch(e){byId('status').innerHTML='<div class="msg">'+window.esc(e.message)+'</div>';}
+  };
+
+  window.askAI=async function(){
+    if(!window.chart)return;
+    const q=byId('question').value.trim();
+    if(!q)return;
+    window.addBubble('user',q); byId('question').value=''; byId('askBtn').disabled=true; window.showTyping();
+    try{
+      const viewingYear=normalizeYear(viewYear?.value||currentYear);
+      const d=await window.call('/api/luan-giai',{method:'POST',body:JSON.stringify({
+        ngay:Number(byId('day').value),
+        thang:Number(byId('month').value),
+        nam:Number(byId('year').value),
+        nam_xem:viewingYear,
+        gio_sinh:byId('hour').value,
+        gioi_tinh:byId('gender').value,
+        ten:byId('name').value,
+        duong_lich:byId('calendar').value==='true',
+        time_zone:Number(byId('tz').value),
+        question:q,
+        year:viewingYear
+      })});
+      window.removeTyping(); window.addBubble('assistant',d.answer||'Chưa cấu hình AI API key');
+    }catch(e){window.removeTyping();window.addBubble('assistant','⚠️ '+e.message)}
+    finally{byId('askBtn').disabled=false;}
+  };
+})();
+</script>
+'''
+    return html.replace('</body>', script + '</body>')
+
+
+@app.get("/", response_class=HTMLResponse)
+def root() -> HTMLResponse:
+    if not WEB_INDEX.exists():
+        raise HTTPException(status_code=500, detail="Thiếu index.html")
+    return HTMLResponse(_inject_viewing_year_ui(WEB_INDEX.read_text(encoding="utf-8")))
+
+
+@app.get("/ai-mode", response_class=FileResponse)
+def ai_mode_page() -> FileResponse:
+    if not AI_MODE_INDEX.exists():
+        raise HTTPException(status_code=500, detail="Thiếu ai_mode.html")
+    return FileResponse(AI_MODE_INDEX, media_type="text/html")
+
+
+@app.get("/api/health")
+def health() -> dict[str, Any]:
+    return {"status": "ok", "service": "tv-ai", "version": "2.9"}
+
+
+@app.get("/api/ai-modes")
+def ai_modes() -> dict[str, Any]:
+    return {"modes": _available_ai_modes()}
+
+
+@app.get("/api/ai-providers")
+def ai_providers() -> dict[str, Any]:
+    return {
+        "providers": [
+            {"id": "gemini", "name": "Gemini", "env_key": "GEMINI_API_KEY", "model_env": "GEMINI_MODEL"},
+            {"id": "openai", "name": "ChatGPT / OpenAI", "env_key": "OPENAI_API_KEY", "model_env": "OPENAI_MODEL"},
+        ]
+    }
+
+
+@app.get("/api/google-sheets-test")
+def google_sheets_test() -> dict[str, Any]:
+    try:
+        import google_sheets_storage as storage
+        result = storage.save_user_profile(
+            user_id="diagnostic",
+            name="_TEST_",
+            ngay_sinh="01/01/2000",
+            gio_sinh="Tý",
+            gioi_tinh="Nam",
+            lich="Dương lịch",
+            time_zone=7,
+            created_at=datetime.now(timezone.utc).astimezone(VN_TZ).isoformat(timespec="seconds"),
+        )
+        return {"ok": True, "result": result}
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Không thể luận giải: {type(exc).__name__}: {exc}") from exc
+        return {"ok": False, "error_type": type(exc).__name__, "error": str(exc)}
+
+
+@app.get("/api/cach-cuc")
+def cach_cuc() -> dict[str, Any]:
+    return {"count": len(load_cach_cuc()), "items": load_cach_cuc()}
+
+
+@app.post("/api/lap-so")
+def lap_so(req: BirthRequest) -> dict[str, Any]:
+    try:
+        chart = _prepare_chart(req)
+        calc = calculate_chart(chart, **_view_args(req))
+        chart["van"] = calc.get("van", {})
+        chart.setdefault("viewing", {})["year"] = _view_year(req)
+        save_status = _save_profile(req)
+        chart.setdefault("storage", {})["user_profile"] = save_status
+        return chart
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Không thể lập lá số: {type(exc).__name__}: {exc}") from exc
+
+
+@app.post("/api/luan-giai")
+def luan_giai(req: AskRequest, request: Request) -> dict[str, Any]:
+    try:
+        chart = _prepare_chart(req)
+        target_year = _view_year(req, req.year)
+        calc = calculate_chart(
+            chart,
+            year=target_year,
+            month=req.thang_xem,
+            day=req.ngay_xem,
+            hour=req.gio_xem,
+        )
+        chart["van"] = calc.get("van", {})
+        chart.setdefault("viewing", {})["year"] = target_year
+        ai_context = _ai_context_for_request(chart, calc)
+        cach_cuc_analysis = chart.get("cach_cuc_analysis", {})
+        books = _load_json(BOOKS_FILE, {})
+        mode_text, mode_id = _load_ai_mode(request.cookies.get("tv_ai_mode", "standard"))
+        provider_id = normalize_provider(req.provider or request.cookies.get("tv_ai_provider", "gemini"))
+        reasoning = calc.get("van", {}).get("reasoning_context", {})
+
+        prompt = f'''Năm luận: {target_year}\n\nCHẾ ĐỘ LUẬN GIẢI ĐƯỢC CHỌN:\n{mode_text}\n\nCÂU HỎI:\n{req.question}\n\nCONTEXT AI CHÍNH THỨC:\n{_compact(ai_context, 70000)}\n\nCÁC LỚP VẬN ĐÃ TÍNH:\n{_compact(calc.get("van", {}), 35000)}\n\nCÂY SUY LUẬN VẬN HẠN:\n{_compact(reasoning, 35000)}\n\nBẰNG CHỨNG CÁCH CỤC:\n{_compact(cach_cuc_analysis, 30000)}\n\nQUAN HỆ CUNG:\n{_compact(ai_context.get("relationship_knowledge", {}), 20000)}\n\nTÀI LIỆU:\n{_compact(books, 40000)}\n\nQUY TẮC BẮT BUỘC:\n- Chỉ dùng CONTEXT AI CHÍNH THỨC và CÁC LỚP VẬN ĐÃ TÍNH làm nguồn sự kiện; không suy ngược Tiểu vận từ từng cung của lá số.\n- Phải luận theo workflow trong CÂY SUY LUẬN VẬN HẠN, không bỏ qua Đại vận để nhảy thẳng sang Lưu niên/tháng.\n- Phân biệt rõ: Nguyên cục là nền; Đại vận là nền dài hạn; Lưu niên/Tiểu vận là kích hoạt năm; Lưu nguyệt/Lưu nhật/Lưu thời chỉ là lớp kích hoạt vi mô.\n- Đọc Đồng cung trước, sau đó Tam Hợp + Xung Chiếu, rồi Nhị Hợp + Giáp Cung và Tuần/Triệt.\n- Không gọi Giáp Cung là Nhị Hợp. Không gọi Xung Chiếu là Tam Hợp.\n- Một sự kiện mạnh phải có nhiều lớp cùng quy tụ; không kết luận chắc chắn từ một sao, một sát tinh hoặc một quan hệ đơn lẻ.\n- Chỉ dùng Cách Cục đã match từ engine.\n- Lưu nguyệt phải ưu tiên Tiết khí; không đồng nhất tháng âm lịch với tháng Tiết khí.\n- Không tự an sao, không tự thêm hoặc sửa dữ liệu engine.\n- Nếu thiếu ngày/tháng/giờ xem, không bịa Lưu nhật/Lưu thời; chỉ luận tới tầng dữ liệu thực có.'''
+        answer, selected_provider = generate_ai(
+            provider=provider_id,
+            system_instruction=_system_prompt() + "\nAI chỉ diễn giải dữ liệu từ engine Python local.",
+            prompt=prompt,
+        )
+        return {
+            "chart": chart,
+            "calculation": calc,
+            "answer": answer,
+            "ai_status": "ok",
+            "ai_mode": mode_id,
+            "ai_provider": selected_provider,
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Không thể luận giải: {type(exc).__name__}: {exc}") from exc
