@@ -104,6 +104,19 @@ def _view_year(req: BirthRequest, explicit_year: int | None = None) -> int:
 def _view_args(req: BirthRequest, default_year: int | None = None) -> dict[str, Any]:
     return {"year": _view_year(req, default_year), "month": req.thang_xem, "day": req.ngay_xem, "hour": req.gio_xem}
 
+def _profile_id(req: BirthRequest) -> str:
+    name = req.ten.strip() or "—"
+    birth_date = f"{req.ngay:02d}/{req.thang:02d}/{req.nam:04d}"
+    key = "|".join([
+        name.casefold(),
+        birth_date,
+        str(req.gio_sinh).strip().casefold(),
+        req.gioi_tinh.strip().casefold(),
+        "Dương lịch" if req.duong_lich else "Âm lịch",
+        str(req.time_zone),
+    ])
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"tvai-profile:{key}"))
+
 def _save_profile(req: BirthRequest) -> dict[str, Any]:
     try:
         from google_sheets_storage import save_user_profile
@@ -111,7 +124,7 @@ def _save_profile(req: BirthRequest) -> dict[str, Any]:
         name = req.ten.strip() or "—"
         birth_date = f"{req.ngay:02d}/{req.thang:02d}/{req.nam:04d}"
         return save_user_profile(
-            user_id=str(uuid.uuid4()),
+            user_id=_profile_id(req),
             name=name,
             ngay_sinh=birth_date,
             gio_sinh=str(req.gio_sinh),
