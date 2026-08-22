@@ -111,39 +111,33 @@ def _palace_by_number(chart: dict[str, Any], palace_number: Any) -> dict[str, An
 
 
 def _source_luu_nien_dai_van(age: int, cung_dai_van: int, bat_dau: int, direction: int) -> int | None:
-    """Lưu niên trong Đại vận theo quy tắc authoritative mới.
+    """Lưu niên trong Đại vận theo vòng vận thuận/nghịch.
 
-    Quy tắc:
-    - Năm đầu của Đại vận: chính cung Đại vận = 0.
-    - Năm kế tiếp: cung xung chiếu của cung Đại vận = 1.
-    - Từ năm thứ 2 trở đi: đi thuận lần lượt từng cung +1.
+    Quy tắc authoritative:
+    - Dương Nam / Âm Nữ: vòng vận thuận (+1).
+    - Dương Nữ / Âm Nam: vòng vận nghịch (-1).
+    - Năm thứ 1 của Đại vận: chính cung Đại vận = mốc 0.
+    - Năm thứ 2: cung xung chiếu = mốc 1 (+6 cung).
+    - Từ năm thứ 3: từ cung xung chiếu tiếp tục +1 hoặc -1 theo chiều vòng vận.
+    - Chỉ chạy 10 năm trong một Đại vận.
 
-    Chuỗi vị trí trong một Đại vận 10 năm có dạng:
-        0: cung Đại vận
-        1: cung xung chiếu = +6
-        2: +7
-        3: +8
-        4: +9
-        5: +10
-        6: +11
-        7: +0 (vòng lại)
-        8: +1
-        9: +2
-
-    ``direction`` của chiều Đại vận KHÔNG được dùng để đảo chiều chuỗi này.
-    Tham số chỉ giữ lại để tương thích API cũ.
+    Với offset = năm - tuổi_bắt_đầu:
+        0 -> Đại vận
+        1 -> Xung chiếu
+        2 -> Xung chiếu + direction
+        3 -> Xung chiếu + 2*direction
+        ...
     """
-    del direction
     khoi = int(age) - int(bat_dau)
     x = int(cung_dai_van)
+    step = 1 if int(direction) >= 0 else -1
     if khoi < 0 or khoi > 9:
         return None
     if khoi == 0:
         return x
     if khoi == 1:
         return (x + 6 - 1) % 12 + 1
-    # Sau cung xung chiếu, luôn đi thuận từng cung.
-    return (x + 5 + khoi - 1) % 12 + 1
+    return (x + 6 + (khoi - 1) * step - 1) % 12 + 1
 
 
 def _sync_luu_nien_layers(chart: dict[str, Any], van: dict[str, Any]) -> None:
@@ -187,7 +181,7 @@ def _sync_luu_nien_layers(chart: dict[str, Any], van: dict[str, Any]) -> None:
     luu_nien["phuong_phap"] = (
         "Lưu niên bản mệnh = cung có Chi năm xem; "
         "Lưu niên Đại vận = năm 0 tại cung Đại vận, năm 1 tại cung xung chiếu, "
-        "từ năm 2 đi thuận từng cung đến hết Đại vận."
+        "từ năm 2 đi +1/-1 theo chiều vòng vận đến hết Đại vận."
     )
     van["luu_nien"] = luu_nien
     van["luu_nien_dai_van"] = {
@@ -197,7 +191,8 @@ def _sync_luu_nien_layers(chart: dict[str, Any], van: dict[str, Any]) -> None:
         "tuoi": age,
         "nam_thu_trong_dai_van": (int(age) - int(dv["tuoi_bat_dau"])) if dv and age is not None else None,
         "dai_van_cung_so": dv.get("cung_so") if dv else None,
-        "phuong_phap": "0=Đại vận; 1=Xung chiếu; 2..9=đi thuận từng cung.",
+        "chieu_van": "thuận (+1 cung)" if direction == 1 else "nghịch (-1 cung)",
+        "phuong_phap": "0=Đại vận; 1=Xung chiếu; 2..9 dịch +1/-1 theo chiều vòng vận.",
     }
 
 
@@ -239,11 +234,12 @@ def _dynamic_sync_contract(van: dict[str, Any]) -> dict[str, Any]:
     tieu = van.get("tieu_van") or {}
     year = van.get("year") or {}
     return {
-        "source_of_truth": "Lưu niên=Chi năm xem; Lưu niên Đại vận=0 tại Đại vận, 1=Xung chiếu, 2..9 đi thuận; Tiểu vận=cung khởi + mốc Tý",
+        "source_of_truth": "Lưu niên=Chi năm xem; Lưu niên Đại vận=0 tại Đại vận, 1=Xung chiếu, 2..9 dịch theo chiều vòng vận; Tiểu vận=cung khởi + mốc Tý",
         "year": year.get("nam"),
         "year_chi": year.get("chi_ten"),
         "luu_nien_cung_so": (van.get("luu_nien") or {}).get("cung_so"),
         "luu_nien_dai_van_cung_so": (van.get("luu_nien_dai_van") or {}).get("cung_so"),
+        "luu_nien_dai_van_direction": (van.get("luu_nien_dai_van") or {}).get("chieu_van"),
         "tieu_van_cung_so": tieu.get("cung_so"),
         "tieu_van_cung": tieu.get("cung"),
         "tieu_van_dia_chi": tieu.get("dia_chi"),
@@ -287,7 +283,7 @@ def calculate_chart(
     chart["ai_context"] = build_ai_context(chart, van=deepcopy(van))
 
     return {
-        "calculator_version": "3.7",
+        "calculator_version": "3.8",
         "relations": relations,
         "van": van,
     }
