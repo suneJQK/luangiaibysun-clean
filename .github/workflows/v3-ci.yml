@@ -1,0 +1,27 @@
+name: V3 CI
+on:
+  push:
+    branches: ["v3-independent"]
+  pull_request:
+    branches: ["v3-independent"]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Compile Python
+        run: python -m compileall -q .
+      - name: Validate JSON
+        run: python - <<'PY'
+import json
+from pathlib import Path
+for p in Path('.').rglob('*.json'):
+    json.loads(p.read_text(encoding='utf-8'))
+print('JSON OK')
+PY
+      - name: Validate frontend files
+        run: test -f index.html && test -f style.css && test -f app.js && test -f van10.css && test -f van10.js
