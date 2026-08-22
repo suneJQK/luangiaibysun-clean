@@ -1,38 +1,48 @@
-"""Tính Tiểu vận theo đúng quy tắc khởi cung và chiều nam/nữ.
+"""Tính Tiểu hạn/Tiểu vận theo Tam hợp năm sinh và chiều Nam/Nữ.
 
-Quy tắc:
-- Thân/Tý/Thìn khởi tại Tuất.
-- Tỵ/Dậu/Sửu khởi tại Mùi.
-- Dần/Ngọ/Tuất khởi tại Thìn.
-- Hợi/Mão/Mùi khởi tại Sửu.
-- Chi năm sinh là mốc của tuổi 1 tại cung khởi.
-- Nam đi thuận; Nữ đi nghịch.
-- Từ Chi năm sinh đếm đến Chi năm xem; Chi năm xem nằm ở cung nào
-  thì đó là cung Tiểu vận/Tiểu hạn của năm đang xét.
+Quy tắc authoritative của hệ thống:
+- Thân – Tý – Thìn: khởi tại Tuất.
+- Dần – Ngọ – Tuất: khởi tại Thìn.
+- Tỵ – Dậu – Sửu: khởi tại Mùi.
+- Hợi – Mão – Mùi: khởi tại Sửu.
+- Nam: đếm thuận.
+- Nữ: đếm nghịch.
+- Cung khởi được đặt là Tý.
+- Từ mốc Tý đó đếm đến Chi của năm xem theo chiều Nam/Nữ.
+- Cung thực tế nơi Chi năm xem dừng lại là cung Tiểu hạn/Tiểu vận.
 
-Không dùng tuổi mụ để quyết định vị trí Tiểu vận; tuổi chỉ giữ để hiển thị/đối chiếu.
+Ví dụ Hợi sinh thuộc nhóm Hợi – Mão – Mùi, cung khởi là Sửu.
+Quy ước Sửu = Tý, Dần = Sửu, Mão = Dần, ... .
+Năm xem có Chi Ngọ thì nam đi thuận sẽ dừng tại Mùi.
+
+Không dùng tuổi mụ để quyết định vị trí Tiểu hạn; tuổi chỉ giữ để hiển thị/đối chiếu.
 Không hard-code kết quả của một năm cụ thể.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 BRANCHES = ["Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi", "Thân", "Dậu", "Tuất", "Hợi"]
 
-# Địa Chi cung khởi, không phải tên cung chức năng của lá số.
-START_BRANCH_BY_BIRTH_GROUP = {
-    1: "Tuất",  # Tý
-    5: "Tuất",  # Thìn
-    9: "Tuất",  # Thân
-    6: "Mùi",   # Tỵ
-    10: "Mùi",  # Dậu
-    2: "Mùi",   # Sửu
-    3: "Thìn",  # Dần
-    7: "Thìn",  # Ngọ
-    11: "Thìn", # Tuất
-    12: "Sửu",  # Hợi
-    4: "Sửu",  # Mão
-    8: "Sửu",  # Mùi
+# Cung khởi được quy định theo 4 nhóm Tam hợp của Chi năm sinh.
+# Dùng tên Chi thay vì số để tránh nhầm thứ tự/ánh xạ.
+START_BRANCH_BY_BIRTH_BRANCH = {
+    # Thân – Tý – Thìn
+    "Tý": "Tuất",
+    "Thìn": "Tuất",
+    "Thân": "Tuất",
+    # Tỵ – Dậu – Sửu
+    "Tỵ": "Mùi",
+    "Dậu": "Mùi",
+    "Sửu": "Mùi",
+    # Dần – Ngọ – Tuất
+    "Dần": "Thìn",
+    "Ngọ": "Thìn",
+    "Tuất": "Thìn",
+    # Hợi – Mão – Mùi
+    "Hợi": "Sửu",
+    "Mão": "Sửu",
+    "Mùi": "Sửu",
 }
 
 
@@ -51,57 +61,66 @@ def chi_name(value: int) -> str:
     return BRANCHES[check(value) - 1]
 
 
+def _gender_direction(gender: str) -> tuple[int, str]:
+    normalized = str(gender).strip().casefold()
+    if normalized in {"nam", "male", "m", "1"}:
+        return 1, "thuận"
+    if normalized in {"nữ", "nu", "female", "f", "0", "2"}:
+        return -1, "nghịch"
+    raise ValueError(f"Giới tính không hợp lệ để tính Tiểu hạn: {gender!r}")
+
+
 def build_tieu_van_source_mapping(
-    check_fn,
-    chi_name_fn,
+    check_fn: Callable[[int], int],
+    chi_name_fn: Callable[[int], str],
     birth_branch: int,
     target_branch: int,
     gender: str,
     age: int | None = None,
 ) -> dict[str, Any]:
-    """Tính Tiểu vận theo mốc Chi năm sinh -> Chi năm xem.
+    """Tính vị trí Tiểu hạn theo cung khởi -> mốc Tý -> Chi năm xem.
 
-    Vị trí chính được tính trực tiếp bằng khoảng cách giữa Chi năm sinh và
-    Chi năm xem, sau đó áp khoảng cách đó lên cung khởi của nhóm Tam hợp.
-    Tuổi chỉ là dữ liệu đối chiếu/hiển thị.
+    Quy trình:
+      1. Xác định nhóm Tam hợp của Chi năm sinh.
+      2. Tra cung khởi của nhóm đó.
+      3. Quy ước cung khởi là Tý (mốc đếm = 0).
+      4. Lấy Chi năm xem làm chỉ tiêu cần tìm trong vòng 12 Chi, bắt đầu
+         từ Tý và đi theo chiều Nam/Nữ.
+      5. Cung thực tế tương ứng với Chi năm xem là cung Tiểu hạn/Tiểu vận.
+
+    ``age`` chỉ được giữ làm dữ liệu đối chiếu/hiển thị. Nó không quyết định
+    vị trí chính.
     """
     birth_branch = check_fn(birth_branch)
     target_branch = check_fn(target_branch)
-    is_male = str(gender).strip().casefold() in {"nam", "male", "m", "1"}
-    direction = 1 if is_male else -1
 
-    if birth_branch not in START_BRANCH_BY_BIRTH_GROUP:
-        raise ValueError(f"Không xác định được cung khởi Tiểu vận cho Chi sinh {birth_branch}")
+    birth_name = chi_name_fn(birth_branch)
+    target_name = chi_name_fn(target_branch)
+    start_branch_name = START_BRANCH_BY_BIRTH_BRANCH.get(birth_name)
+    if start_branch_name is None:
+        raise ValueError(f"Không xác định được cung khởi Tiểu hạn cho Chi sinh {birth_name!r}")
 
-    start_branch_name = START_BRANCH_BY_BIRTH_GROUP[birth_branch]
+    direction, direction_name = _gender_direction(gender)
     start_branch = branch_number(start_branch_name)
 
-    # Khoảng cách từ Chi năm sinh đến Chi năm xem.
-    target_offset = (
-        (target_branch - birth_branch) % 12
-        if is_male
-        else (birth_branch - target_branch) % 12
-    )
-
-    if age is None:
-        age = target_offset + 1
-    age = max(1, int(age))
-
-    # Chi năm sinh = mốc tuổi 1 tại cung khởi; từ đó đếm tới Chi năm xem.
-    palace_branch = check_fn(start_branch + direction * target_offset)
+    # Cung khởi được xem là Tý. Vì vậy index Chi của năm xem chính là số bước
+    # tính từ mốc Tý theo chiều Nam/Nữ.
+    target_steps_from_ti = (target_branch - 1) % 12
+    palace_branch = check_fn(start_branch + direction * target_steps_from_ti)
     palace_branch_name = chi_name_fn(palace_branch)
 
+    # Tạo bảng kiểm tra 12 bước: mỗi bước ghi Chi quy ước tại cung thực tế.
     sequence: list[dict[str, Any]] = []
     for step in range(12):
-        year_branch = check_fn(birth_branch + direction * step)
-        palace = check_fn(start_branch + direction * step)
+        mapped_year_branch = check_fn(1 + direction * step)
+        palace_at_step = check_fn(start_branch + direction * step)
         sequence.append({
             "thu_tu": step + 1,
-            "tuoi_trong_chu_ky": step + 1,
-            "chi_nam": year_branch,
-            "chi_nam_ten": chi_name_fn(year_branch),
-            "cung_dia_chi": palace,
-            "cung_dia_chi_ten": chi_name_fn(palace),
+            "buoc_tu_ti": step,
+            "chi_nam": mapped_year_branch,
+            "chi_nam_ten": chi_name_fn(mapped_year_branch),
+            "cung_dia_chi": palace_at_step,
+            "cung_dia_chi_ten": chi_name_fn(palace_at_step),
         })
 
     return {
@@ -109,23 +128,27 @@ def build_tieu_van_source_mapping(
         "cung_dia_chi_ten": palace_branch_name,
         "cung_so": palace_branch,
         "chi_nam": target_branch,
-        "chi_ten": chi_name_fn(target_branch),
+        "chi_ten": target_name,
         "chi_nam_sinh": birth_branch,
-        "chi_nam_sinh_ten": chi_name_fn(birth_branch),
-        "khoang_cach_chi": target_offset,
-        "tuoi": age,
-        "huong": "thuận" if direction == 1 else "nghịch",
+        "chi_nam_sinh_ten": birth_name,
+        "khoang_cach_chi": target_steps_from_ti,
+        "tuoi": max(1, int(age)) if age is not None else target_steps_from_ti + 1,
+        "huong": direction_name,
         "cung_khoi": start_branch,
         "cung_khoi_ten": start_branch_name,
+        "cung_khoi_dat_lam_ti": True,
+        "tam_hop_nam_sinh": [k for k, v in START_BRANCH_BY_BIRTH_BRANCH.items() if v == start_branch_name],
         "phuong_phap": (
-            "Lấy Chi năm sinh làm mốc tuổi 1 tại cung khởi; từ Chi năm sinh "
-            "đếm thuận (Nam) hoặc nghịch (Nữ) đến Chi năm xem; Chi năm xem "
-            "nằm ở cung nào thì đó là Tiểu vận."
+            "Tra cung khởi theo Tam hợp Chi năm sinh; đặt cung khởi làm Tý; "
+            "Nam đếm thuận, Nữ đếm nghịch từ Tý đến Chi năm xem; "
+            "cung thực tế nơi Chi năm xem dừng lại là cung Tiểu hạn"
         ),
         "source_formula": {
-            "mo_c": "Chi năm sinh -> cung khởi",
-            "vi_tri_nam": "check(cung_khoi + direction * khoang_cach_chi)",
-            "khoang_cach_chi_nam": "Nam: (Chi_nam_xem - Chi_nam_sinh) mod 12; Nữ: (Chi_nam_sinh - Chi_nam_xem) mod 12",
+            "cung_khoi": "tra theo Tam hợp Chi năm sinh",
+            "moc_dem": "cung_khoi = Tý",
+            "so_buoc": "index(Chi_nam_xem) với Tý=0",
+            "vi_tri_tieu_han": "check(cung_khoi + direction * index(Chi_nam_xem))",
+            "direction": "Nam = +1 (thuận); Nữ = -1 (nghịch)",
         },
         "sequence": sequence,
     }
