@@ -1,4 +1,4 @@
-"""Deterministic chart relations and structured vận context."""
+"""Deterministic chart relations and authoritative 10-year vận context."""
 from __future__ import annotations
 
 from copy import deepcopy
@@ -31,7 +31,6 @@ NHI_HOP = {
 
 
 def _norm_branch(value: Any) -> str | None:
-    """Chuẩn hóa Địa Chi dạng Tý/Ty/ty1/ty2... về tên chuẩn."""
     if value is None:
         return None
     raw = str(value).strip().casefold()
@@ -55,8 +54,25 @@ def _branch_number(value: Any) -> int | None:
     return BRANCHES.index(normalized) + 1 if normalized in BRANCHES else None
 
 
-def _branch_distance(a: str, b: str) -> int:
-    return (BRANCHES.index(b) - BRANCHES.index(a)) % 12
+def _palace_by_number(chart: dict[str, Any], palace_number: Any) -> dict[str, Any] | None:
+    try:
+        number = int(palace_number)
+    except (TypeError, ValueError):
+        return None
+    for palace in (chart.get("12_cung") or {}).values():
+        if isinstance(palace, dict) and int(palace.get("cung_so", 0) or 0) == number:
+            return palace
+    return None
+
+
+def _palace_by_branch(chart: dict[str, Any], branch: Any) -> dict[str, Any] | None:
+    target = _norm_branch(branch)
+    if target is None:
+        return None
+    for palace in (chart.get("12_cung") or {}).values():
+        if isinstance(palace, dict) and _norm_branch(palace.get("dia_chi")) == target:
+            return palace
+    return None
 
 
 def relation(a: dict[str, Any], b: dict[str, Any]) -> str:
@@ -76,176 +92,198 @@ def relation(a: dict[str, Any], b: dict[str, Any]) -> str:
 
     if any({branch_a, branch_b}.issubset(group) for group in TAM_PHUONG_GROUPS):
         return "tam_hop"
-    if _branch_distance(branch_a, branch_b) == 6:
+    if (BRANCHES.index(branch_b) - BRANCHES.index(branch_a)) % 12 == 6:
         return "xung_chieu"
     if frozenset((branch_a, branch_b)) in NHI_HOP:
         return "nhi_hop"
     return "other"
 
 
-def _branch_palace_map(chart: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    result: dict[str, dict[str, Any]] = {}
-    for palace in (chart.get("12_cung") or {}).values():
-        if not isinstance(palace, dict):
-            continue
-        branch = _norm_branch(palace.get("dia_chi"))
-        if branch:
-            result[branch] = palace
-    return result
+def _dv_direction_text(van: dict[str, Any]) -> tuple[int, str]:
+    text = str(((van.get("dai_van") or {}).get("huong")) or "thuận").strip().casefold()
+    if text == "nghịch":
+        return -1, "nghịch"
+    return 1, "thuận"
 
 
-def _palace_by_branch(chart: dict[str, Any], branch: Any) -> dict[str, Any] | None:
-    branch_name = _norm_branch(branch)
-    return _branch_palace_map(chart).get(branch_name) if branch_name else None
+def _luu_nien_dai_van_position(
+    nam_thu: int,
+    cung_dai_van: int,
+    direction: int,
+) -> tuple[int, str]:
+    """Authoritative 10-year sequence.
 
-
-def _palace_by_number(chart: dict[str, Any], palace_number: Any) -> dict[str, Any] | None:
-    try:
-        number = int(palace_number)
-    except (TypeError, ValueError):
-        return None
-    for palace in (chart.get("12_cung") or {}).values():
-        if isinstance(palace, dict) and palace.get("cung_so") == number:
-            return palace
-    return None
-
-
-def _source_luu_nien_dai_van(age: int, cung_dai_van: int, bat_dau: int, direction: int) -> int | None:
-    """Lưu niên trong Đại vận theo vòng vận thuận/nghịch.
-
-    Quy tắc authoritative:
-    - Dương Nam / Âm Nữ: vòng vận thuận (+1).
-    - Dương Nữ / Âm Nam: vòng vận nghịch (-1).
-    - Năm thứ 1 của Đại vận: chính cung Đại vận = mốc 0.
-    - Năm thứ 2: cung xung chiếu = mốc 1 (+6 cung).
-    - Từ năm thứ 3: từ cung xung chiếu tiếp tục +1 hoặc -1 theo chiều vòng vận.
-    - Chỉ chạy 10 năm trong một Đại vận.
-
-    Với offset = năm - tuổi_bắt_đầu:
-        0 -> Đại vận
-        1 -> Xung chiếu
-        2 -> Xung chiếu + direction
-        3 -> Xung chiếu + 2*direction
-        ...
+    Nam thu 1 = cung Dai van.
+    Nam thu 2 = cung xung chieu.
+    Nam thu 3 = xung chieu - direction (thuan -> -1, nghich -> +1).
+    Nam thu 4 tro di tiep tuc tu nam thu 3 theo direction.
     """
-    khoi = int(age) - int(bat_dau)
-    x = int(cung_dai_van)
-    step = 1 if int(direction) >= 0 else -1
-    if khoi < 0 or khoi > 9:
-        return None
-    if khoi == 0:
-        return x
-    if khoi == 1:
-        return (x + 6 - 1) % 12 + 1
-    return (x + 6 + (khoi - 1) * step - 1) % 12 + 1
+    xung = (int(cung_dai_van) + 6 - 1) % 12 + 1
+    if nam_thu == 1:
+        return int(cung_dai_van), "Năm 1 = cung Đại vận."
+    if nam_thu == 2:
+        return xung, "Năm 2 = cung xung chiếu."
+    # Year 3 is the special transition step; after that, continue in the
+    # same direction as the main vòng vận.
+    offset_from_xung = nam_thu - 3
+    step = int(direction)
+    cung = (xung - step + offset_from_xung * step - 1) % 12 + 1
+    if nam_thu == 3:
+        detail = "Năm 3 = xung chiếu -1 theo vòng thuận." if direction == 1 else "Năm 3 = xung chiếu +1 theo vòng nghịch."
+    else:
+        detail = "Từ năm 4 tiếp tục +1 theo vòng thuận." if direction == 1 else "Từ năm 4 tiếp tục -1 theo vòng nghịch."
+    return cung, detail
 
 
-def _sync_luu_nien_layers(chart: dict[str, Any], van: dict[str, Any]) -> None:
-    """Đóng dấu rõ các lớp Lưu niên và Lưu niên trong Đại vận."""
-    year = van.get("year") or {}
-    target_branch = year.get("chi")
-    luu_nien_palace = _palace_by_branch(chart, target_branch)
-    luu_nien = van.get("luu_nien") or {}
-
+def _current_dai_van(van: dict[str, Any]) -> dict[str, Any] | None:
     dv = (van.get("dai_van") or {}).get("dang_xet") or {}
-    age = van.get("age")
-    direction_text = (van.get("dai_van") or {}).get("huong", "thuận")
-    direction = 1 if direction_text == "thuận" else -1
-
-    luu_nien_dv_palace_no = None
-    if dv and age is not None:
-        luu_nien_dv_palace_no = _source_luu_nien_dai_van(
-            int(age),
-            int(dv["cung_so"]),
-            int(dv["tuoi_bat_dau"]),
-            direction,
-        )
-
-    dv_palace = _palace_by_number(chart, luu_nien_dv_palace_no)
-    if luu_nien_dv_palace_no is not None:
-        luu_nien["cung_luu_nien_trong_dai_van"] = luu_nien_dv_palace_no
-        luu_nien["cung_luu_nien_trong_dai_van_detail"] = {
-            "cung_so": dv_palace.get("cung_so") if dv_palace else luu_nien_dv_palace_no,
-            "cung": dv_palace.get("cung") if dv_palace else None,
-            "dia_chi": _norm_branch(dv_palace.get("dia_chi")) if dv_palace else None,
-        }
-
-    luu_nien["cung_so"] = luu_nien_palace.get("cung_so") if luu_nien_palace else None
-    luu_nien["cung_nam"] = luu_nien["cung_so"]
-    luu_nien["cung_detail"] = {
-        "cung_so": luu_nien_palace.get("cung_so") if luu_nien_palace else None,
-        "cung": luu_nien_palace.get("cung") if luu_nien_palace else None,
-        "dia_chi": _norm_branch(luu_nien_palace.get("dia_chi")) if luu_nien_palace else None,
-        "can_chi": luu_nien_palace.get("can_chi") if luu_nien_palace else None,
-    }
-    luu_nien["phuong_phap"] = (
-        "Lưu niên bản mệnh = cung có Chi năm xem; "
-        "Lưu niên Đại vận = năm 0 tại cung Đại vận, năm 1 tại cung xung chiếu, "
-        "từ năm 2 đi +1/-1 theo chiều vòng vận đến hết Đại vận."
-    )
-    van["luu_nien"] = luu_nien
-    van["luu_nien_dai_van"] = {
-        "cung_so": luu_nien_dv_palace_no,
-        "cung": dv_palace.get("cung") if dv_palace else None,
-        "dia_chi": _norm_branch(dv_palace.get("dia_chi")) if dv_palace else None,
-        "tuoi": age,
-        "nam_thu_trong_dai_van": (int(age) - int(dv["tuoi_bat_dau"])) if dv and age is not None else None,
-        "dai_van_cung_so": dv.get("cung_so") if dv else None,
-        "chieu_van": "thuận (+1 cung)" if direction == 1 else "nghịch (-1 cung)",
-        "phuong_phap": "0=Đại vận; 1=Xung chiếu; 2..9 dịch +1/-1 theo chiều vòng vận.",
-    }
+    if not dv or dv.get("cung_so") is None or dv.get("tuoi_bat_dau") is None:
+        return None
+    return dv
 
 
-def _sync_tieu_van(chart: dict[str, Any], van: dict[str, Any]) -> None:
-    """Tính Tiểu vận theo cung khởi + mốc Tý, rồi tra đúng cung thực tế."""
-    thien_ban = chart.get("thien_ban", {}) if isinstance(chart, dict) else {}
-    inp = chart.get("input", {}) if isinstance(chart, dict) else {}
-    birth_branch = _branch_number(thien_ban.get("chi_nam"))
-    year_branch = _branch_number((van.get("year") or {}).get("chi"))
-    age = van.get("age")
-    gender = str(inp.get("gioi_tinh", "Nam"))
-    if birth_branch is None or year_branch is None:
-        return
+def _build_luu_nien_dai_van_10_nam(chart: dict[str, Any], van: dict[str, Any]) -> list[dict[str, Any]]:
+    dv = _current_dai_van(van)
+    year_info = van.get("year") or {}
+    if dv is None or year_info.get("nam") is None:
+        return []
 
+    direction, direction_name = _dv_direction_text(van)
+    start_age = int(dv["tuoi_bat_dau"])
+    start_year = int(year_info.get("nam")) - int(van.get("age")) + start_age
+    rows: list[dict[str, Any]] = []
+
+    for nam_thu in range(1, 11):
+        tuoi = start_age + nam_thu - 1
+        nam = start_year + nam_thu - 1
+        cung_so, calc = _luu_nien_dai_van_position(nam_thu, int(dv["cung_so"]), direction)
+        palace = _palace_by_number(chart, cung_so) or {}
+        rows.append({
+            "nam": nam,
+            "tuoi": tuoi,
+            "nam_thu": nam_thu,
+            "cung_so": cung_so,
+            "cung": palace.get("cung"),
+            "dia_chi": palace.get("dia_chi"),
+            "can_chi": palace.get("can_chi"),
+            "la_nam_dang_xem": nam == int(year_info.get("nam")),
+            "huong": direction_name,
+            "cung_dai_van": int(dv["cung_so"]),
+            "cung_xung_chieu": (int(dv["cung_so"]) + 6 - 1) % 12 + 1,
+            "cach_tinh": calc,
+        })
+    return rows
+
+
+def _build_tieu_van_for_year(chart: dict[str, Any], birth_branch: int, year: int, gender: str, age: int) -> dict[str, Any]:
+    # The dedicated patch is the single source of truth for Tiểu vận.
+    _, target_branch = __import__("tuvi_engine.van_calculator", fromlist=["can_chi_year"]).can_chi_year(year)
     canonical = build_tieu_van_source_mapping(
         lambda x: (int(x) - 1) % 12 + 1,
         lambda x: BRANCHES[(int(x) - 1) % 12],
         birth_branch,
-        year_branch,
+        target_branch,
         gender,
-        age=int(age) if age is not None else None,
+        age=age,
     )
-
-    target_palace = _palace_by_number(chart, canonical.get("cung_so"))
-    if target_palace is None:
-        raise ValueError(f"Không tìm thấy cung số {canonical.get('cung_so')!r} trong 12 cung lá số")
-
-    canonical["cung_so"] = target_palace.get("cung_so")
-    canonical["cung"] = target_palace.get("cung")
-    canonical["dia_chi"] = target_palace.get("dia_chi")
-    canonical["dia_chi_chuan"] = _norm_branch(target_palace.get("dia_chi"))
-    canonical["can_chi"] = target_palace.get("can_chi")
-    canonical["cung_chuc_nang"] = target_palace.get("cung")
-    canonical["source_of_truth"] = "van_tieu_van_patch.build_tieu_van_source_mapping"
-    van["tieu_van"] = canonical
-
-
-def _dynamic_sync_contract(van: dict[str, Any]) -> dict[str, Any]:
-    tieu = van.get("tieu_van") or {}
-    year = van.get("year") or {}
+    target_palace = _palace_by_number(chart, canonical.get("cung_so")) or {}
     return {
-        "source_of_truth": "Lưu niên=Chi năm xem; Lưu niên Đại vận=0 tại Đại vận, 1=Xung chiếu, 2..9 dịch theo chiều vòng vận; Tiểu vận=cung khởi + mốc Tý",
-        "year": year.get("nam"),
-        "year_chi": year.get("chi_ten"),
-        "luu_nien_cung_so": (van.get("luu_nien") or {}).get("cung_so"),
-        "luu_nien_dai_van_cung_so": (van.get("luu_nien_dai_van") or {}).get("cung_so"),
-        "luu_nien_dai_van_direction": (van.get("luu_nien_dai_van") or {}).get("chieu_van"),
-        "tieu_van_cung_so": tieu.get("cung_so"),
-        "tieu_van_cung": tieu.get("cung"),
-        "tieu_van_dia_chi": tieu.get("dia_chi"),
-        "tieu_van_dia_chi_chuan": tieu.get("dia_chi_chuan"),
-        "tieu_van_chi_nam": tieu.get("chi_ten"),
-        "tieu_van_tuoi": tieu.get("tuoi"),
+        **canonical,
+        "nam": year,
+        "tuoi": age,
+        "nam_thu": None,
+        "cung_so": target_palace.get("cung_so", canonical.get("cung_so")),
+        "cung": target_palace.get("cung"),
+        "dia_chi": target_palace.get("dia_chi"),
+        "dia_chi_chuan": _norm_branch(target_palace.get("dia_chi")),
+        "can_chi": target_palace.get("can_chi"),
+        "cung_chuc_nang": target_palace.get("cung"),
+        "la_nam_dang_xem": False,
+        "source_of_truth": "van_tieu_van_patch.build_tieu_van_source_mapping",
+        "cach_tinh": "Cung khởi theo Tam hợp Chi năm sinh; đặt cung khởi làm mốc Tý; Nam đếm thuận, Nữ đếm nghịch đến Chi năm xem.",
+    }
+
+
+def _build_tieu_van_10_nam(chart: dict[str, Any], van: dict[str, Any]) -> list[dict[str, Any]]:
+    dv = _current_dai_van(van)
+    year_info = van.get("year") or {}
+    if dv is None or year_info.get("nam") is None:
+        return []
+
+    thien_ban = chart.get("thien_ban") or {}
+    birth_branch = _branch_number(thien_ban.get("chi_nam"))
+    if birth_branch is None:
+        return []
+    gender = str((chart.get("input") or {}).get("gioi_tinh", "Nam"))
+
+    start_age = int(dv["tuoi_bat_dau"])
+    start_year = int(year_info.get("nam")) - int(van.get("age")) + start_age
+    rows: list[dict[str, Any]] = []
+    direction_name = "thuận" if gender.strip().casefold() in {"nam", "male", "m", "1"} else "nghịch"
+
+    for nam_thu in range(1, 11):
+        tuoi = start_age + nam_thu - 1
+        nam = start_year + nam_thu - 1
+        row = _build_tieu_van_for_year(chart, birth_branch, nam, gender, tuoi)
+        row["nam_thu"] = nam_thu
+        row["huong"] = direction_name
+        row["la_nam_dang_xem"] = nam == int(year_info.get("nam"))
+        row["cung_khoi"] = row.get("cung_khoi")
+        row["cung_khoi_ten"] = row.get("cung_khoi_ten")
+        rows.append(row)
+    return rows
+
+
+def _sync_layers(chart: dict[str, Any], van: dict[str, Any]) -> None:
+    luu_rows = _build_luu_nien_dai_van_10_nam(chart, van)
+    tieu_rows = _build_tieu_van_10_nam(chart, van)
+    year = int((van.get("year") or {}).get("nam"))
+
+    van["luu_nien_dai_van_10_nam"] = luu_rows
+    van["tieu_van_10_nam"] = tieu_rows
+    van["van_10_nam"] = {
+        "source_of_truth": "tu_vi_calculator authoritative 10-year layer",
+        "dai_van_cung_so": ((van.get("dai_van") or {}).get("dang_xet") or {}).get("cung_so"),
+        "dai_van_tuoi_bat_dau": ((van.get("dai_van") or {}).get("dang_xet") or {}).get("tuoi_bat_dau"),
+        "dai_van_tuoi_ket_thuc": ((van.get("dai_van") or {}).get("dang_xet") or {}).get("tuoi_ket_thuc"),
+        "huong_vong_van": "thuận" if _dv_direction_text(van)[0] == 1 else "nghịch",
+        "luu_nien_dai_van": luu_rows,
+        "tieu_van": tieu_rows,
+    }
+
+    current_luu = next((r for r in luu_rows if r["nam"] == year), None)
+    current_tieu = next((r for r in tieu_rows if r["nam"] == year), None)
+
+    if current_luu:
+        van["luu_nien_dai_van"] = {
+            "cung_so": current_luu["cung_so"],
+            "cung": current_luu["cung"],
+            "dia_chi": current_luu["dia_chi"],
+            "tuoi": current_luu["tuoi"],
+            "nam_thu_trong_dai_van": current_luu["nam_thu"],
+            "dai_van_cung_so": current_luu["cung_dai_van"],
+            "cung_xung_chieu": current_luu["cung_xung_chieu"],
+            "chieu_van": "thuận (+1 cung)" if _dv_direction_text(van)[0] == 1 else "nghịch (-1 cung)",
+            "phuong_phap": "Năm 1=Đại vận; năm 2=Xung chiếu; năm 3=xung chiếu đối ứng; từ năm 4 tiếp tục theo chiều vòng vận.",
+        }
+    if current_tieu:
+        van["tieu_van"] = current_tieu
+
+    base_luu = van.get("luu_nien") or {}
+    base_luu["cung_luu_nien_trong_dai_van"] = current_luu.get("cung_so") if current_luu else None
+    base_luu["cung_luu_nien_trong_dai_van_detail"] = current_luu
+    van["luu_nien"] = base_luu
+
+    van["sync_contract"] = {
+        "source_of_truth": "Lưu niên=Chi năm xem; Lưu niên Đại vận=chuỗi 10 năm authoritative; Tiểu vận=chuỗi 10 năm authoritative",
+        "year": year,
+        "year_chi": (van.get("year") or {}).get("chi_ten"),
+        "luu_nien_cung_so": (base_luu.get("cung_so") if base_luu else None),
+        "luu_nien_dai_van_cung_so": current_luu.get("cung_so") if current_luu else None,
+        "tieu_van_cung_so": current_tieu.get("cung_so") if current_tieu else None,
+        "tieu_van_cung": current_tieu.get("cung") if current_tieu else None,
+        "tieu_van_dia_chi": current_tieu.get("dia_chi") if current_tieu else None,
+        "tieu_van_chi_nam": current_tieu.get("chi_ten") if current_tieu else None,
         "static_palace_tieu_van_must_not_be_used": True,
     }
 
@@ -276,14 +314,12 @@ def calculate_chart(
                 })
 
     van = calculate_van_layers(chart, year=year, month=month, day=day, hour=hour)
-    _sync_luu_nien_layers(chart, van)
-    _sync_tieu_van(chart, van)
-    van["sync_contract"] = _dynamic_sync_contract(van)
+    _sync_layers(chart, van)
     van["reasoning_context"] = build_reasoning_context(chart, van)
     chart["ai_context"] = build_ai_context(chart, van=deepcopy(van))
 
     return {
-        "calculator_version": "3.8",
+        "calculator_version": "4.0-authoritative-10y",
         "relations": relations,
         "van": van,
     }
