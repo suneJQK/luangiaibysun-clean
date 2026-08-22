@@ -1,8 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "routes": [
-    { "src": "^/new-ui/?$", "dest": "/api/new_ui.py?path=index.html" },
-    { "src": "^/new-ui/(.*)$", "dest": "/api/new_ui.py?path=$1" },
+    { "src": "/new-ui", "dest": "/api/new_ui.py?path=index.html" },
+    { "src": "/new-ui/(.*)", "dest": "/api/new_ui.py?path=$1" },
     { "src": "^/$", "dest": "/api/chat_ui.py" },
     { "src": "^/api/(.*)$", "dest": "/api/index.py" }
   ]
