@@ -106,32 +106,29 @@ def _dv_direction_text(van: dict[str, Any]) -> tuple[int, str]:
     return 1, "thuận"
 
 
-def _luu_nien_dai_van_position(
-    nam_thu: int,
-    cung_dai_van: int,
-    direction: int,
-) -> tuple[int, str]:
-    """Authoritative 10-year sequence.
+def _luu_nien_dai_van_position(nam_thu: int, cung_dai_van: int, direction: int) -> tuple[int, str]:
+    """10-year Lưu niên Đại vận.
 
-    Nam thu 1 = cung Dai van.
-    Nam thu 2 = cung xung chieu.
-    Nam thu 3 = xung chieu - direction (thuan -> -1, nghich -> +1).
-    Nam thu 4 tro di tiep tuc tu nam thu 3 theo direction.
+    Năm 1 = cung Đại vận.
+    Năm 2 = cung xung chiếu.
+    Năm 3 = xung chiếu -1 nếu vòng thuận, +1 nếu vòng nghịch.
+    Năm 4 = quay về cung năm 2.
+    Năm 5 trở đi tiếp tục dịch theo chiều vòng vận.
     """
     xung = (int(cung_dai_van) + 6 - 1) % 12 + 1
     if nam_thu == 1:
         return int(cung_dai_van), "Năm 1 = cung Đại vận."
     if nam_thu == 2:
         return xung, "Năm 2 = cung xung chiếu."
-    # Year 3 is the special transition step; after that, continue in the
-    # same direction as the main vòng vận.
-    offset_from_xung = nam_thu - 3
+
     step = int(direction)
-    cung = (xung - step + offset_from_xung * step - 1) % 12 + 1
+    cung = (xung - step + (nam_thu - 3) * step - 1) % 12 + 1
     if nam_thu == 3:
         detail = "Năm 3 = xung chiếu -1 theo vòng thuận." if direction == 1 else "Năm 3 = xung chiếu +1 theo vòng nghịch."
+    elif nam_thu == 4:
+        detail = "Năm 4 = trở về cung năm 2 (xung chiếu)."
     else:
-        detail = "Từ năm 4 tiếp tục +1 theo vòng thuận." if direction == 1 else "Từ năm 4 tiếp tục -1 theo vòng nghịch."
+        detail = "Từ năm 5 tiếp tục +1 theo vòng thuận." if direction == 1 else "Từ năm 5 tiếp tục -1 theo vòng nghịch."
     return cung, detail
 
 
@@ -176,8 +173,9 @@ def _build_luu_nien_dai_van_10_nam(chart: dict[str, Any], van: dict[str, Any]) -
 
 
 def _build_tieu_van_for_year(chart: dict[str, Any], birth_branch: int, year: int, gender: str, age: int) -> dict[str, Any]:
-    # The dedicated patch is the single source of truth for Tiểu vận.
-    _, target_branch = __import__("tuvi_engine.van_calculator", fromlist=["can_chi_year"]).can_chi_year(year)
+    from tuvi_engine.van_calculator import can_chi_year
+
+    _, target_branch = can_chi_year(year)
     canonical = build_tieu_van_source_mapping(
         lambda x: (int(x) - 1) % 12 + 1,
         lambda x: BRANCHES[(int(x) - 1) % 12],
@@ -191,7 +189,6 @@ def _build_tieu_van_for_year(chart: dict[str, Any], birth_branch: int, year: int
         **canonical,
         "nam": year,
         "tuoi": age,
-        "nam_thu": None,
         "cung_so": target_palace.get("cung_so", canonical.get("cung_so")),
         "cung": target_palace.get("cung"),
         "dia_chi": target_palace.get("dia_chi"),
@@ -228,63 +225,118 @@ def _build_tieu_van_10_nam(chart: dict[str, Any], van: dict[str, Any]) -> list[d
         row["nam_thu"] = nam_thu
         row["huong"] = direction_name
         row["la_nam_dang_xem"] = nam == int(year_info.get("nam"))
-        row["cung_khoi"] = row.get("cung_khoi")
-        row["cung_khoi_ten"] = row.get("cung_khoi_ten")
         rows.append(row)
+    return rows
+
+
+def _build_luu_nien_nam_10_nam(chart: dict[str, Any], van: dict[str, Any]) -> list[dict[str, Any]]:
+    """Lưu niên năm: mỗi năm lấy Chi của chính năm đó và tra cung cùng Địa Chi.
+
+    Đây là lớp thứ tư, độc lập hoàn toàn với Đại vận, Lưu niên Đại vận và Tiểu vận.
+    """
+    dv = _current_dai_van(van)
+    year_info = van.get("year") or {}
+    if dv is None or year_info.get("nam") is None:
+        return []
+
+    from tuvi_engine.van_calculator import can_chi_year
+
+    start_age = int(dv["tuoi_bat_dau"])
+    start_year = int(year_info.get("nam")) - int(van.get("age")) + start_age
+    rows: list[dict[str, Any]] = []
+
+    for nam_thu in range(1, 11):
+        tuoi = start_age + nam_thu - 1
+        nam = start_year + nam_thu - 1
+        can_no, chi_no = can_chi_year(nam)
+        palace = _palace_by_branch(chart, chi_no) or {}
+        rows.append({
+            "nam": nam,
+            "tuoi": tuoi,
+            "nam_thu": nam_thu,
+            "can": can_no,
+            "chi": chi_no,
+            "can_ten": palace.get("can_ten") or None,
+            "chi_ten": palace.get("chi_ten") or None,
+            "cung_so": palace.get("cung_so"),
+            "cung": palace.get("cung"),
+            "dia_chi": palace.get("dia_chi"),
+            "can_chi": palace.get("can_chi"),
+            "la_nam_dang_xem": nam == int(year_info.get("nam")),
+            "cach_tinh": "Lưu niên năm = lấy Chi của chính năm xem và đặt vào cung có cùng Địa Chi trên lá số.",
+            "source_of_truth": "can_chi_year + cung Địa Chi thực tế của lá số",
+        })
     return rows
 
 
 def _sync_layers(chart: dict[str, Any], van: dict[str, Any]) -> None:
     luu_rows = _build_luu_nien_dai_van_10_nam(chart, van)
     tieu_rows = _build_tieu_van_10_nam(chart, van)
+    luu_nam_rows = _build_luu_nien_nam_10_nam(chart, van)
     year = int((van.get("year") or {}).get("nam"))
-
-    van["luu_nien_dai_van_10_nam"] = luu_rows
-    van["tieu_van_10_nam"] = tieu_rows
-    van["van_10_nam"] = {
-        "source_of_truth": "tu_vi_calculator authoritative 10-year layer",
-        "dai_van_cung_so": ((van.get("dai_van") or {}).get("dang_xet") or {}).get("cung_so"),
-        "dai_van_tuoi_bat_dau": ((van.get("dai_van") or {}).get("dang_xet") or {}).get("tuoi_bat_dau"),
-        "dai_van_tuoi_ket_thuc": ((van.get("dai_van") or {}).get("dang_xet") or {}).get("tuoi_ket_thuc"),
-        "huong_vong_van": "thuận" if _dv_direction_text(van)[0] == 1 else "nghịch",
-        "luu_nien_dai_van": luu_rows,
-        "tieu_van": tieu_rows,
-    }
+    dv = _current_dai_van(van) or {}
 
     current_luu = next((r for r in luu_rows if r["nam"] == year), None)
     current_tieu = next((r for r in tieu_rows if r["nam"] == year), None)
+    current_luu_nam = next((r for r in luu_nam_rows if r["nam"] == year), None)
 
-    if current_luu:
-        van["luu_nien_dai_van"] = {
-            "cung_so": current_luu["cung_so"],
-            "cung": current_luu["cung"],
-            "dia_chi": current_luu["dia_chi"],
-            "tuoi": current_luu["tuoi"],
-            "nam_thu_trong_dai_van": current_luu["nam_thu"],
-            "dai_van_cung_so": current_luu["cung_dai_van"],
-            "cung_xung_chieu": current_luu["cung_xung_chieu"],
-            "chieu_van": "thuận (+1 cung)" if _dv_direction_text(van)[0] == 1 else "nghịch (-1 cung)",
-            "phuong_phap": "Năm 1=Đại vận; năm 2=Xung chiếu; năm 3=xung chiếu đối ứng; từ năm 4 tiếp tục theo chiều vòng vận.",
-        }
-    if current_tieu:
-        van["tieu_van"] = current_tieu
+    # 1) Đại vận: chỉ một khoảng 10 năm, lấy từ chính lá số hiện hành.
+    van["dai_van_10_nam"] = {
+        "cung_so": dv.get("cung_so"),
+        "cung": (_palace_by_number(chart, dv.get("cung_so")) or {}).get("cung"),
+        "dia_chi": (_palace_by_number(chart, dv.get("cung_so")) or {}).get("dia_chi"),
+        "tuoi_bat_dau": dv.get("tuoi_bat_dau"),
+        "tuoi_ket_thuc": dv.get("tuoi_ket_thuc", int(dv.get("tuoi_bat_dau", 0)) + 9),
+        "huong": "thuận" if _dv_direction_text(van)[0] == 1 else "nghịch",
+        "source_of_truth": "12_cung.dai_van của lá số",
+    }
 
-    base_luu = van.get("luu_nien") or {}
-    base_luu["cung_luu_nien_trong_dai_van"] = current_luu.get("cung_so") if current_luu else None
-    base_luu["cung_luu_nien_trong_dai_van_detail"] = current_luu
-    van["luu_nien"] = base_luu
+    # 2) Lưu niên Đại vận: 10 năm trong đúng Đại vận đó.
+    van["luu_nien_dai_van_10_nam"] = luu_rows
+    van["luu_nien_dai_van"] = current_luu
 
+    # 3) Tiểu vận: 10 năm độc lập với Đại vận.
+    van["tieu_van_10_nam"] = tieu_rows
+    van["tieu_van"] = current_tieu
+
+    # 4) Lưu niên năm / Lưu niên Tiểu vận: 10 năm, mỗi năm lấy Chi năm đó.
+    van["luu_nien_nam_10_nam"] = luu_nam_rows
+    van["luu_nien_nam"] = current_luu_nam
+    van["luu_nien_tieu_van_10_nam"] = luu_nam_rows
+    van["luu_nien_tieu_van"] = current_luu_nam
+
+    direction, direction_name = _dv_direction_text(van)
+    van["van_10_nam"] = {
+        "source_of_truth": "4 lớp vận hạn độc lập",
+        "dai_van": van["dai_van_10_nam"],
+        "luu_nien_dai_van": luu_rows,
+        "tieu_van": tieu_rows,
+        "luu_nien_nam": luu_nam_rows,
+        "dai_van_huong": direction_name,
+        "dai_van_direction": direction,
+    }
+
+    # Hợp đồng AI: không gộp trường, không cho AI suy ngược một lớp từ lớp khác.
     van["sync_contract"] = {
-        "source_of_truth": "Lưu niên=Chi năm xem; Lưu niên Đại vận=chuỗi 10 năm authoritative; Tiểu vận=chuỗi 10 năm authoritative",
-        "year": year,
-        "year_chi": (van.get("year") or {}).get("chi_ten"),
-        "luu_nien_cung_so": (base_luu.get("cung_so") if base_luu else None),
-        "luu_nien_dai_van_cung_so": current_luu.get("cung_so") if current_luu else None,
-        "tieu_van_cung_so": current_tieu.get("cung_so") if current_tieu else None,
-        "tieu_van_cung": current_tieu.get("cung") if current_tieu else None,
-        "tieu_van_dia_chi": current_tieu.get("dia_chi") if current_tieu else None,
-        "tieu_van_chi_nam": current_tieu.get("chi_ten") if current_tieu else None,
-        "static_palace_tieu_van_must_not_be_used": True,
+        "source_of_truth": "FOUR_VAN_LAYERS",
+        "rules": {
+            "dai_van": "1 khoảng 10 năm lấy từ cung Đại vận thực tế của lá số.",
+            "luu_nien_dai_van": "10 năm trong Đại vận: năm 1=Đại vận; năm 2=Xung chiếu; năm 3=xung chiếu ±1 theo chiều đối ứng; năm 4 quay về cung năm 2; năm 5 trở đi tiếp tục theo chiều vòng vận.",
+            "tieu_van": "10 năm độc lập: Chi năm sinh -> Tam hợp -> cung khởi -> cung khởi làm mốc Tý -> Nam thuận/Nữ nghịch -> Chi từng năm.",
+            "luu_nien_nam": "10 năm độc lập: mỗi năm lấy Chi của chính năm đó -> cung có cùng Địa Chi trên 12 cung.",
+        },
+        "must_not_mix": [
+            "luu_nien_dai_van MUST NOT be used as tieu_van",
+            "tieu_van MUST NOT be used as luu_nien_nam",
+            "luu_nien_nam MUST NOT be used as luu_nien_dai_van",
+            "dai_van MUST NOT be inferred from the selected year palace",
+        ],
+        "nam_xem": year,
+        "dai_van": van["dai_van_10_nam"],
+        "luu_nien_dai_van": current_luu,
+        "tieu_van": current_tieu,
+        "luu_nien_nam": current_luu_nam,
+        "luu_nien_tieu_van": current_luu_nam,
     }
 
 
@@ -319,7 +371,7 @@ def calculate_chart(
     chart["ai_context"] = build_ai_context(chart, van=deepcopy(van))
 
     return {
-        "calculator_version": "4.0-authoritative-10y",
+        "calculator_version": "4.1-four-layer-authoritative",
         "relations": relations,
         "van": van,
     }
