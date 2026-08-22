@@ -1,32 +1,91 @@
 name: Move Cach Cuc Pha Giam
+
 on:
   push:
     branches: [main]
+    paths:
+      - index.html
+      - .github/workflows/move-cach-pha-giam.yml
+  workflow_dispatch:
+
 permissions:
   contents: write
+
+concurrency:
+  group: move-cach-pha-giam
+  cancel-in-progress: true
+
 jobs:
   patch:
-    if: github.event.head_commit.message != 'chore: remove temporary move-cach-pha-giam workflow'
+    if: github.event_name != 'push' || github.event.head_commit.message != 'fix: move Cach Cuc Pha Giam into Cach Cuc panel'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
       - name: Patch index.html
         shell: python
         run: |
           from pathlib import Path
-          p=Path('index.html')
-          text=p.read_text(encoding='utf-8')
-          old='<section id="cach" class="pane"><div class="split"><div class="panel card"><h3>Cách Cục đã match</h3><div id="cachList"></div></div><div class="panel card"><h3>Cách Cục Phá/Giảm</h3><div id="modList"></div></div></div></section>'
-          new='<section id="cach" class="pane"><div class="panel card"><h3>Cách Cục</h3><div id="cachList"></div><div class="cach-subsection"><h4>Cách Cục Phá/Giảm</h4><div id="modList"></div></div></div></section>'
-          if old not in text: raise SystemExit('layout pattern not found')
-          text=text.replace(old,new,1)
-          style='''<style>.cach-subsection{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}.cach-subsection h4{margin:0 0 8px;color:#f4d996}</style>'''
-          text=text.replace('</head>',style+'</head>',1)
-          p.write_text(text,encoding='utf-8')
+
+          p = Path('index.html')
+          text = p.read_text(encoding='utf-8')
+
+          current = '<section id="cach" class="pane"><div class="panel card"><h3>Cách Cục</h3><div id="cachList"></div><div class="cach-subsection"><h4>Cách Cục Phá/Giảm</h4><div id="modList"></div></div></div></section>'
+          old = '<section id="cach" class="pane"><div class="split"><div class="panel card"><h3>Cách Cục đã match</h3><div id="cachList"></div></div><div class="panel card"><h3>Cách Cục Phá/Giảm</h3><div id="modList"></div></div></div></section>'
+          old_modifier_title = '<h3>Modifier phá / giảm</h3>'
+          new_title = '<h3>Cách Cục Phá/Giảm</h3>'
+          style = '<style>.cach-subsection{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}.cach-subsection h4{margin:0 0 8px;color:#f4d996}</style>'
+
+          if current in text and style in text:
+              print('index.html already patched: PASS')
+              raise SystemExit(0)
+
+          changed = False
+
+          if old in text:
+              text = text.replace(old, current, 1)
+              changed = True
+          elif old_modifier_title in text:
+              text = text.replace(old_modifier_title, new_title, 1)
+              changed = True
+
+          if changed and style not in text:
+              text = text.replace('</head>', style + '</head>', 1)
+
+          if not changed:
+              raise SystemExit('index.html layout pattern not recognized')
+
+          p.write_text(text, encoding='utf-8')
+          print('index.html patched: PASS')
+
+      - name: Verify patch
+        shell: python
+        run: |
+          from pathlib import Path
+          text = Path('index.html').read_text(encoding='utf-8')
+          required = [
+              '<h3>Cách Cục</h3>',
+              '<h4>Cách Cục Phá/Giảm</h4>',
+              'id="cachList"',
+              'id="modList"',
+          ]
+          missing = [x for x in required if x not in text]
+          if missing:
+              raise SystemExit(f'Patch verification failed: {missing}')
+          print('Patch verification: PASS')
+
       - name: Commit patched index
+        shell: bash
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add index.html
-          git diff --cached --quiet || git commit -m 'fix: move Cach Cuc Pha Giam into Cach Cuc panel'
+          if git diff --cached --quiet; then
+            echo 'No changes required.'
+            exit 0
+          fi
+          git commit -m 'fix: move Cach Cuc Pha Giam into Cach Cuc panel'
           git push
