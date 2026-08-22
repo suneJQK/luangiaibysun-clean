@@ -127,14 +127,16 @@ def _build_tieu_van_10_nam(chart: dict[str, Any], van: dict[str, Any]) -> list[d
         _can, target_branch = _legacy.can_chi_year(target_year)
         mapping = _legacy._tieu_van_source_mapping(birth_branch, target_branch, gender)
         cung_so = mapping.get("cung_so")
-        palace = _palace_by_number(chart, cung_so)
+        palace = _palace_by_branch(chart, mapping.get("cung_dia_chi"))
+        if palace is None:
+            palace = _palace_by_number(chart, cung_so)
         rows.append({
             "nam": target_year,
             "tuoi": age,
             "nam_thu": idx + 1,
             "chi_nam": target_branch,
             "chi_ten": _legacy.chi_name(target_branch),
-            "cung_so": cung_so,
+            "cung_so": palace.get("cung_so") if palace else cung_so,
             "cung": palace.get("cung") if palace else None,
             "dia_chi": palace.get("dia_chi") if palace else None,
             "can_chi": palace.get("can_chi") if palace else None,
@@ -205,7 +207,6 @@ def calculate_van_layers(
     van["luu_nien_dai_van_10_nam"] = dv10
     van["tieu_van_10_nam"] = tv10
     van["luu_nien_nam_10_nam"] = ln10
-    # Tên cũ tương thích để không phá các mode/payload cũ.
     van["luu_nien_tieu_van_10_nam"] = ln10
     van["van_10_nam"] = {
         "dai_van_cung_so": (van.get("dai_van") or {}).get("dang_xet", {}).get("cung_so"),
