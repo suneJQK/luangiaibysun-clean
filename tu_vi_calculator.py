@@ -280,7 +280,6 @@ def _sync_layers(chart: dict[str, Any], van: dict[str, Any]) -> None:
     current_tieu = next((r for r in tieu_rows if r["nam"] == year), None)
     current_luu_nam = next((r for r in luu_nam_rows if r["nam"] == year), None)
 
-    # 1) Đại vận: chỉ một khoảng 10 năm, lấy từ chính lá số hiện hành.
     van["dai_van_10_nam"] = {
         "cung_so": dv.get("cung_so"),
         "cung": (_palace_by_number(chart, dv.get("cung_so")) or {}).get("cung"),
@@ -290,16 +289,10 @@ def _sync_layers(chart: dict[str, Any], van: dict[str, Any]) -> None:
         "huong": "thuận" if _dv_direction_text(van)[0] == 1 else "nghịch",
         "source_of_truth": "12_cung.dai_van của lá số",
     }
-
-    # 2) Lưu niên Đại vận: 10 năm trong đúng Đại vận đó.
     van["luu_nien_dai_van_10_nam"] = luu_rows
     van["luu_nien_dai_van"] = current_luu
-
-    # 3) Tiểu vận: 10 năm độc lập với Đại vận.
     van["tieu_van_10_nam"] = tieu_rows
     van["tieu_van"] = current_tieu
-
-    # 4) Lưu niên năm / Lưu niên Tiểu vận: 10 năm, mỗi năm lấy Chi năm đó.
     van["luu_nien_nam_10_nam"] = luu_nam_rows
     van["luu_nien_nam"] = current_luu_nam
     van["luu_nien_tieu_van_10_nam"] = luu_nam_rows
@@ -316,7 +309,6 @@ def _sync_layers(chart: dict[str, Any], van: dict[str, Any]) -> None:
         "dai_van_direction": direction,
     }
 
-    # Hợp đồng AI: không gộp trường, không cho AI suy ngược một lớp từ lớp khác.
     van["sync_contract"] = {
         "source_of_truth": "FOUR_VAN_LAYERS",
         "rules": {
@@ -337,6 +329,10 @@ def _sync_layers(chart: dict[str, Any], van: dict[str, Any]) -> None:
         "tieu_van": current_tieu,
         "luu_nien_nam": current_luu_nam,
         "luu_nien_tieu_van": current_luu_nam,
+        # Compatibility aliases for api/index.py and older clients.
+        "tieu_van_cung_so": (current_tieu or {}).get("cung_so"),
+        "tieu_van_chi": (current_tieu or {}).get("chi_ten") or (current_tieu or {}).get("chi_nam"),
+        "tieu_van_tuoi": (current_tieu or {}).get("tuoi"),
     }
 
 
