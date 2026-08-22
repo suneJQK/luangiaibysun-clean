@@ -43,6 +43,19 @@ def _service():
     return build("sheets", "v4", credentials=_credentials(), cache_discovery=False)
 
 
+def _birth_date_text(value: str) -> str:
+    """Normalize birth date to an explicit text value such as 11/11/1996.
+
+    Google Sheets must not parse the value as a date serial. The append call
+    below uses RAW, so the string is stored literally instead of becoming
+    values such as 35380.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    return text
+
+
 def save_user_profile(*, user_id: str, name: str, ngay_sinh: str, gio_sinh: str, gioi_tinh: str, lich: str, time_zone: float, created_at: str) -> dict[str, Any]:
     service = _service()
     spreadsheet_id = _sheet_id()
@@ -57,11 +70,12 @@ def save_user_profile(*, user_id: str, name: str, ngay_sinh: str, gio_sinh: str,
             body={"values": [HEADERS]},
         ).execute()
 
-    row = [user_id, name, ngay_sinh, gio_sinh, gioi_tinh, lich, str(time_zone), created_at]
+    birth_date = _birth_date_text(ngay_sinh)
+    row = [user_id, name, birth_date, gio_sinh, gioi_tinh, lich, str(time_zone), created_at]
     result = values_api.append(
         spreadsheetId=spreadsheet_id,
         range="A:H",
-        valueInputOption="USER_ENTERED",
+        valueInputOption="RAW",
         insertDataOption="INSERT_ROWS",
         body={"values": [row]},
     ).execute()
