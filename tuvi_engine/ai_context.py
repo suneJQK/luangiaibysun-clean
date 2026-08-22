@@ -44,14 +44,15 @@ def _normalize_matched_cach_cuc(chart: dict[str, Any], catalog: list[dict[str, A
 
 def _question_scope(question: str) -> dict[str, Any]:
     q = (question or "").strip().casefold()
-    if any(x in q for x in ("đại vận", "đại hạn", "10 năm", "mười năm")):
-        return {"id": "dai_van", "focus": "dai_van", "weights": {"dai_van": 0.80, "relations_and_stars": 0.20}}
+    # More-specific scopes must be checked before the generic "Đại vận" match.
     if any(x in q for x in ("lưu niên đại vận", "lưu đại hạn", "lưu đại vận")):
         return {"id": "luu_nien_dai_van", "focus": "luu_nien_dai_van", "weights": {"dai_van": 0.25, "luu_nien_dai_van": 0.50, "tieu_van": 0.10, "luu_nien_nam": 0.15}}
     if any(x in q for x in ("tiểu hạn", "tiểu vận")):
         return {"id": "tieu_van", "focus": "tieu_van", "weights": {"dai_van": 0.20, "luu_nien_dai_van": 0.20, "tieu_van": 0.40, "luu_nien_nam": 0.20}}
     if any(x in q for x in ("lưu niên năm", "lưu thái tuế", "thái tuế")):
         return {"id": "luu_nien_nam", "focus": "luu_nien_nam", "weights": {"dai_van": 0.20, "luu_nien_dai_van": 0.15, "tieu_van": 0.20, "luu_nien_nam": 0.45}}
+    if any(x in q for x in ("đại vận", "đại hạn", "10 năm", "mười năm")):
+        return {"id": "dai_van", "focus": "dai_van", "weights": {"dai_van": 0.80, "relations_and_stars": 0.20}}
     return {"id": "tong_hop_nam", "focus": "tong_hop_nam", "weights": {"dai_van": 0.55, "luu_nien_dai_van": 0.18, "tieu_van": 0.15, "luu_nien_nam": 0.12}}
 
 
