@@ -58,11 +58,13 @@ def _load_json(path: Path, default: Any) -> Any:
 
 def _system_prompt() -> str:
     parts: list[str] = []
-    if ROOT_PROMPT_FILE.exists(): parts.append(ROOT_PROMPT_FILE.read_text(encoding="utf-8").strip())
+    if ROOT_PROMPT_FILE.exists():
+        parts.append(ROOT_PROMPT_FILE.read_text(encoding="utf-8").strip())
     if PROMPT_DIR.exists():
         for path in sorted(PROMPT_DIR.glob("*.txt")):
             text = path.read_text(encoding="utf-8").strip()
-            if text: parts.append(text)
+            if text:
+                parts.append(text)
     return "\n\n".join(x for x in parts if x) or "Bạn là chuyên gia Tử Vi Đẩu Số."
 
 def _available_ai_modes() -> list[dict[str, str]]:
@@ -139,21 +141,73 @@ def _inject_viewing_year_ui(html: str) -> str:
   const currentYear=new Date().getFullYear(), MIN_YEAR=1800, MAX_YEAR=2200;
   const byId=id=>document.getElementById(id);
   const normalizeYear=value=>{const n=Number(value); if(!Number.isFinite(n)) return currentYear; return Math.min(MAX_YEAR,Math.max(MIN_YEAR,Math.trunc(n)));};
+  const esc=v=>String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const viewYear=byId('viewYear');
   if(viewYear){viewYear.min=String(MIN_YEAR);viewYear.max=String(MAX_YEAR);viewYear.step='1';viewYear.value=normalizeYear(viewYear.value||currentYear);viewYear.addEventListener('change',()=>{viewYear.value=normalizeYear(viewYear.value);});}
   const setViewYear=y=>{if(viewYear){viewYear.value=normalizeYear(y);viewYear.dispatchEvent(new Event('change'));}};
+  const firstArray=(...vals)=>vals.find(v=>Array.isArray(v)&&v.length) || [];
+  const luckList=van=>{
+    const v=van||{};
+    return firstArray(v.luu_nien_dai_van_10_nam,v.luu_nien_dai_van,v.luu_dai_van_10_nam);
+  };
+  const smallList=van=>{
+    const v=van||{};
+    return firstArray(v.tieu_van_10_nam,v.tieu_van,v.luu_nien_tieu_van_10_nam);
+  };
+  const yearList=van=>{
+    const v=van||{};
+    return firstArray(v.luu_nien_nam_10_nam,v.luu_nien_tieu_van_10_nam);
+  };
+  const palaceName=x=>x?.cung || (x?.cung_so!=null?('Cung '+x.cung_so):'—');
+  const compactCell=x=>{
+    if(!x || typeof x!=='object') return esc(x??'—');
+    const name=palaceName(x), branch=x.dia_chi || x.chi_ten || x.chi || '';
+    return '<b>'+esc(name)+'</b>'+(branch?' <span class="luck-branch">('+esc(branch)+')</span>':'');
+  };
+  window.renderVan10=function(chart){
+    const root=byId('van10Panel');
+    if(!root) return;
+    const van=chart?.van||{};
+    const dv=Array.isArray(van.dai_van_10_nam)?van.dai_van_10_nam:[];
+    const lndv=luckList(van);
+    const tv=smallList(van);
+    const lnn=yearList(van);
+    const rows=[];
+    for(let i=0;i<10;i++){
+      const a=dv[i]||{}, b=lndv[i]||{}, c=tv[i]||{}, d=lnn[i]||{};
+      const year=a.nam ?? b.nam ?? c.nam ?? d.nam;
+      if(year==null) continue;
+      rows.push('<tr data-year="'+esc(year)+'" class="'+(Number(year)===Number(viewYear?.value)?'is-viewing':'')+'">'
+        +'<td><button type="button" class="year-pick" data-year="'+esc(year)+'">'+esc(year)+'</button></td>'
+        +'<td>'+esc(a.tuoi ?? b.tuoi ?? c.tuoi ?? d.tuoi ?? '—')+'</td>'
+        +'<td>'+compactCell(a)+'</td>'
+        +'<td>'+compactCell(b)+'</td>'
+        +'<td>'+compactCell(c)+'</td>'
+        +'<td>'+compactCell(d)+'</td>'
+        +'</tr>');
+    }
+    root.innerHTML='<div class="panel card luck10-card">'
+      +'<div class="section-title"><h3>Vận 10 năm</h3><small>4 lớp vận hạn độc lập</small></div>'
+      +'<div class="luck10-note">📌 Các năm dưới đây là các năm có thể chọn để đặt câu hỏi cho AI. Chọn đúng năm để AI luận Đại vận, Lưu niên Đại vận, Tiểu vận và Lưu niên năm của năm đó.</div>'
+      +'<div class="luck10-wrap"><table class="luck10"><thead><tr><th>Năm</th><th>Tuổi</th><th>Đại vận</th><th>Lưu niên Đại vận</th><th>Tiểu vận</th><th>Lưu niên năm</th></tr></thead><tbody>'+(rows.join('')||'<tr><td colspan="6">Engine chưa trả dữ liệu 10 năm.</td></tr>')+'</tbody></table></div>'
+      +'</div>';
+    root.querySelectorAll('.year-pick').forEach(btn=>btn.addEventListener('click',()=>{
+      const y=normalizeYear(btn.dataset.year); setViewYear(y); window.lapSo?.();
+    }));
+  };
   try{
     const oldLoad=window.loadUserProfile;
     window.loadUserProfile=function(){if(typeof oldLoad==='function') oldLoad();const p=JSON.parse(localStorage.getItem('tvai_user_profile_v1')||'null');if(p&&p.viewYear!=null)setViewYear(p.viewYear);else setViewYear(currentYear);};
     const oldSave=window.saveUserProfile;
     window.saveUserProfile=function(){if(typeof oldSave==='function')oldSave();try{const p=JSON.parse(localStorage.getItem('tvai_user_profile_v1')||'{}');p.viewYear=normalizeYear(viewYear?.value||currentYear);localStorage.setItem('tvai_user_profile_v1',JSON.stringify(p));}catch{}};
   }catch{}
-  window.lapSo=async function(){byId('status').innerHTML='<div class="msg">Đang lập lá số...</div>';try{window.saveUserProfile?.();const viewingYear=normalizeYear(viewYear?.value||currentYear);const d=await window.call('/api/lap-so',{method:'POST',body:JSON.stringify({ngay:Number(byId('day').value),thang:Number(byId('month').value),nam:Number(byId('year').value),nam_xem:viewingYear,gio_sinh:byId('hour').value,gioi_tinh:byId('gender').value,ten:byId('name').value,duong_lich:byId('calendar').value==='true',time_zone:Number(byId('tz').value)})});window.render(d);byId('status').innerHTML='<div class="msg">Đã lập lá số · Năm xem: '+window.esc(viewingYear)+'</div>';}catch(e){byId('status').innerHTML='<div class="msg">'+window.esc(e.message)+'</div>';}};
+  window.lapSo=async function(){byId('status').innerHTML='<div class="msg">Đang lập lá số...</div>';try{window.saveUserProfile?.();const viewingYear=normalizeYear(viewYear?.value||currentYear);const d=await window.call('/api/lap-so',{method:'POST',body:JSON.stringify({ngay:Number(byId('day').value),thang:Number(byId('month').value),nam:Number(byId('year').value),nam_xem:viewingYear,gio_sinh:byId('hour').value,gioi_tinh:byId('gender').value,ten:byId('name').value,duong_lich:byId('calendar').value==='true',time_zone:Number(byId('tz').value)})});window.render(d);window.renderVan10?.(d);byId('status').innerHTML='<div class="msg">Đã lập lá số · Năm xem: '+esc(viewingYear)+'</div>';}catch(e){byId('status').innerHTML='<div class="msg">'+esc(e.message)+'</div>';}};
   window.askAI=async function(){if(!window.chart)return;const q=byId('question').value.trim();if(!q)return;window.addBubble('user',q);byId('question').value='';byId('askBtn').disabled=true;window.showTyping();try{const viewingYear=normalizeYear(viewYear?.value||currentYear);const d=await window.call('/api/luan-giai',{method:'POST',body:JSON.stringify({ngay:Number(byId('day').value),thang:Number(byId('month').value),nam:Number(byId('year').value),nam_xem:viewingYear,gio_sinh:byId('hour').value,gioi_tinh:byId('gender').value,ten:byId('name').value,duong_lich:byId('calendar').value==='true',time_zone:Number(byId('tz').value),question:q,year:viewingYear})});window.removeTyping();window.addBubble('assistant',d.answer||'Chưa cấu hình AI API key');}catch(e){window.removeTyping();window.addBubble('assistant','⚠️ '+e.message)}finally{byId('askBtn').disabled=false;}};
 })();
 </script>
 '''
-    return html.replace('</body>', script + '</body>')
+    style='<style>.luck10-card{margin:12px 0;padding:15px}.luck10-note{margin:9px 0;padding:9px 11px;border:1px solid #30435f;border-radius:10px;background:#09111e;color:#aebbd0;font-size:12px}.luck10-wrap{overflow:auto}.luck10{width:100%;border-collapse:collapse;min-width:860px}.luck10 th,.luck10 td{padding:8px 9px;border:1px solid #30435f;text-align:left;vertical-align:top}.luck10 th{background:#172238;color:#f4d996;font-size:12px}.luck10 td{background:#0b111d;color:#dfe7f6;font-size:12px}.luck10 tr.is-viewing td{background:#211b11;border-color:#876e3d}.luck10 .year-pick{border:1px solid #8a7040;background:#172238;color:#f4d996;border-radius:7px;padding:4px 8px;cursor:pointer;font-weight:800}.luck10 .year-pick:hover{background:#211b11}.luck-branch{color:#93a0b6;font-size:10px}</style>'
+    return html.replace('</head>', style + '</head>').replace('<div id="dashboard" style="display:none">','<div id="dashboard" style="display:none"><div id="van10Panel"></div>',1).replace('</body>', script + '</body>')
 
 @app.get("/", response_class=HTMLResponse)
 def root() -> HTMLResponse:
