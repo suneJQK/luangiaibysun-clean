@@ -1,0 +1,32 @@
+name: Move Cach Cuc Pha Giam
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.event.head_commit.message != 'chore: remove temporary move-cach-pha-giam workflow'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch index.html
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('index.html')
+          text=p.read_text(encoding='utf-8')
+          old='<section id="cach" class="pane"><div class="split"><div class="panel card"><h3>Cách Cục đã match</h3><div id="cachList"></div></div><div class="panel card"><h3>Cách Cục Phá/Giảm</h3><div id="modList"></div></div></div></section>'
+          new='<section id="cach" class="pane"><div class="panel card"><h3>Cách Cục</h3><div id="cachList"></div><div class="cach-subsection"><h4>Cách Cục Phá/Giảm</h4><div id="modList"></div></div></div></section>'
+          if old not in text: raise SystemExit('layout pattern not found')
+          text=text.replace(old,new,1)
+          style='''<style>.cach-subsection{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}.cach-subsection h4{margin:0 0 8px;color:#f4d996}</style>'''
+          text=text.replace('</head>',style+'</head>',1)
+          p.write_text(text,encoding='utf-8')
+      - name: Commit patched index
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git diff --cached --quiet || git commit -m 'fix: move Cach Cuc Pha Giam into Cach Cuc panel'
+          git push
