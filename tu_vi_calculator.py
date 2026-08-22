@@ -111,13 +111,29 @@ def _palace_by_number(chart: dict[str, Any], palace_number: Any) -> dict[str, An
 
 
 def _source_luu_nien_dai_van(age: int, cung_dai_van: int, bat_dau: int, direction: int) -> int | None:
-    """Lưu niên trong Đại vận theo đúng chuỗi lndv() nguồn.
+    """Lưu niên trong Đại vận theo quy tắc authoritative mới.
 
-    Đây là lớp KHÁC với Lưu niên bản mệnh:
-    - Lưu niên bản mệnh: an trực tiếp theo Chi năm xem.
-    - Lưu niên Đại vận: dịch từ cung Đại vận hiện hành theo tuổi trong Đại vận.
+    Quy tắc:
+    - Năm đầu của Đại vận: chính cung Đại vận = 0.
+    - Năm kế tiếp: cung xung chiếu của cung Đại vận = 1.
+    - Từ năm thứ 2 trở đi: đi thuận lần lượt từng cung +1.
+
+    Chuỗi vị trí trong một Đại vận 10 năm có dạng:
+        0: cung Đại vận
+        1: cung xung chiếu = +6
+        2: +7
+        3: +8
+        4: +9
+        5: +10
+        6: +11
+        7: +0 (vòng lại)
+        8: +1
+        9: +2
+
+    ``direction`` của chiều Đại vận KHÔNG được dùng để đảo chiều chuỗi này.
+    Tham số chỉ giữ lại để tương thích API cũ.
     """
-    step = 1 if direction >= 0 else -1
+    del direction
     khoi = int(age) - int(bat_dau)
     x = int(cung_dai_van)
     if khoi < 0 or khoi > 9:
@@ -126,13 +142,12 @@ def _source_luu_nien_dai_van(age: int, cung_dai_van: int, bat_dau: int, directio
         return x
     if khoi == 1:
         return (x + 6 - 1) % 12 + 1
-    if khoi == 2:
-        return (x + 6 - step - 1) % 12 + 1
-    return (x + 6 + (khoi - 3) * step - 1) % 12 + 1
+    # Sau cung xung chiếu, luôn đi thuận từng cung.
+    return (x + 5 + khoi - 1) % 12 + 1
 
 
 def _sync_luu_nien_layers(chart: dict[str, Any], van: dict[str, Any]) -> None:
-    """Đóng dấu rõ 3 lớp vận để downstream/AI không nhập nhằng."""
+    """Đóng dấu rõ các lớp Lưu niên và Lưu niên trong Đại vận."""
     year = van.get("year") or {}
     target_branch = year.get("chi")
     luu_nien_palace = _palace_by_branch(chart, target_branch)
@@ -169,15 +184,20 @@ def _sync_luu_nien_layers(chart: dict[str, Any], van: dict[str, Any]) -> None:
         "dia_chi": _norm_branch(luu_nien_palace.get("dia_chi")) if luu_nien_palace else None,
         "can_chi": luu_nien_palace.get("can_chi") if luu_nien_palace else None,
     }
-    luu_nien["phuong_phap"] = "Lưu niên bản mệnh = cung có Chi năm xem; Lưu niên Đại vận = lndv() trong Đại vận hiện hành."
+    luu_nien["phuong_phap"] = (
+        "Lưu niên bản mệnh = cung có Chi năm xem; "
+        "Lưu niên Đại vận = năm 0 tại cung Đại vận, năm 1 tại cung xung chiếu, "
+        "từ năm 2 đi thuận từng cung đến hết Đại vận."
+    )
     van["luu_nien"] = luu_nien
     van["luu_nien_dai_van"] = {
         "cung_so": luu_nien_dv_palace_no,
         "cung": dv_palace.get("cung") if dv_palace else None,
         "dia_chi": _norm_branch(dv_palace.get("dia_chi")) if dv_palace else None,
         "tuoi": age,
+        "nam_thu_trong_dai_van": (int(age) - int(dv["tuoi_bat_dau"])) if dv and age is not None else None,
         "dai_van_cung_so": dv.get("cung_so") if dv else None,
-        "phuong_phap": "lndv(tuoi, cung_dai_van, tuoi_bat_dau, direction)",
+        "phuong_phap": "0=Đại vận; 1=Xung chiếu; 2..9=đi thuận từng cung.",
     }
 
 
@@ -219,7 +239,7 @@ def _dynamic_sync_contract(van: dict[str, Any]) -> dict[str, Any]:
     tieu = van.get("tieu_van") or {}
     year = van.get("year") or {}
     return {
-        "source_of_truth": "Lưu niên=Chi năm xem; Lưu niên Đại vận=lndv(); Tiểu vận=cung khởi + mốc Tý",
+        "source_of_truth": "Lưu niên=Chi năm xem; Lưu niên Đại vận=0 tại Đại vận, 1=Xung chiếu, 2..9 đi thuận; Tiểu vận=cung khởi + mốc Tý",
         "year": year.get("nam"),
         "year_chi": year.get("chi_ten"),
         "luu_nien_cung_so": (van.get("luu_nien") or {}).get("cung_so"),
