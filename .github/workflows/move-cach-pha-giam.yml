@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - index.html
+      - api/index.py
       - .github/workflows/move-cach-pha-giam.yml
   workflow_dispatch:
 
@@ -17,12 +18,13 @@ concurrency:
 
 jobs:
   patch:
-    if: github.event_name != 'push' || github.event.head_commit.message != 'fix: display all Cach Cuc including Loc Phung Xung Pha'
+    if: github.event_name != 'push' || github.event.head_commit.message != 'fix: sync authoritative Cach Cuc into AI prompt'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
+
       - name: Patch index.html
         shell: python
         run: |
@@ -70,25 +72,38 @@ jobs:
 }'''
           text = text[:start] + new_render + text[end+2:]
           p.write_text(text, encoding='utf-8')
-      - name: Verify patch
+
+      - name: Patch api/index.py
         shell: python
         run: |
           from pathlib import Path
-          text = Path('index.html').read_text(encoding='utf-8')
-          required = [
-            '<section id="cach" class="pane"><div class="panel card cach-panel">',
-            'const modifiers=Array.isArray(analysis.modifiers)?analysis.modifiers:[];',
-            "addItem(x.name||'Cách Cục',x.interpretation||x.ai_instruction||'', '', x.breaking_evidence||[]);"
-          ]
-          missing=[x for x in required if x not in text]
-          if missing: raise SystemExit(f'Missing: {missing}')
-          print('Cách Cục unified verification: PASS')
-      - name: Commit patched index
+          p = Path('api/index.py')
+          text = p.read_text(encoding='utf-8')
+          old = 'payload={"question":req.question,"year":viewing_year,"mode":mode_id,"mode_prompt":mode_text,"chart_context":context,"books":books}'
+          new = 'confirmed_cach_cuc=context.get("confirmed_cach_cuc") or {}; confirmed_modifiers=context.get("cach_cuc_modifiers") or {}; payload={"question":req.question,"year":viewing_year,"mode":mode_id,"mode_prompt":mode_text,"CACH_CUC_AUTHORITATIVE":confirmed_cach_cuc,"CACH_CUC_MODIFIERS_AUTHORITATIVE":confirmed_modifiers,"chart_context":context,"books":books}'
+          if old not in text:
+              raise SystemExit('API payload marker not found')
+          text=text.replace(old,new,1)
+          p.write_text(text,encoding='utf-8')
+
+      - name: Verify authoritative Cach Cuc flow
+        shell: python
+        run: |
+          from pathlib import Path
+          html=Path('index.html').read_text(encoding='utf-8')
+          api=Path('api/index.py').read_text(encoding='utf-8')
+          checks_html=['function renderCach(){','const modifiers=Array.isArray(analysis.modifiers)?analysis.modifiers:[];']
+          checks_api=['CACH_CUC_AUTHORITATIVE','CACH_CUC_MODIFIERS_AUTHORITATIVE']
+          missing=[x for x in checks_html if x not in html]+[x for x in checks_api if x not in api]
+          if missing: raise SystemExit(f'Authoritative Cách Cục verification failed: {missing}')
+          print('Authoritative Cách Cục flow: PASS')
+
+      - name: Commit patched files
         shell: bash
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add index.html
+          git add index.html api/index.py
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'fix: display all Cach Cuc including Loc Phung Xung Pha'
+          git commit -m 'fix: sync authoritative Cach Cuc into AI prompt'
           git push
