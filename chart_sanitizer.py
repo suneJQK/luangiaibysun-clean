@@ -9,6 +9,11 @@ from typing import Any
 MAIN_STAR_IDS = frozenset(range(1, 15))
 TRANG_SINH_IDS = frozenset(range(39, 51))
 TRANSFORMATION_IDS = frozenset(range(92, 96))
+MAIN_STAR_NAMES = frozenset({
+    "tử vi", "liêm trinh", "thiên đồng", "vũ khúc", "thái dương", "thiên cơ",
+    "thiên phủ", "thái âm", "tham lang", "cự môn", "thiên tướng", "thiên lương",
+    "thất sát", "phá quân",
+})
 BRANCHES = ["Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi", "Thân", "Dậu", "Tuất", "Hợi"]
 
 
@@ -51,8 +56,14 @@ def dedupe_stars(stars: Any) -> list[dict[str, Any]]:
     return out
 
 
+def _star_name(star: dict[str, Any]) -> str:
+    value = str(star.get("ten") or "").strip().casefold()
+    value = unicodedata.normalize("NFD", value)
+    return "".join(c for c in value if unicodedata.category(c) != "Mn")
+
+
 def split_engine_stars(stars: Any) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
-    """Trả về (chính tinh, phụ tinh, vòng Tràng Sinh)."""
+    """Trả về (chính tinh, phụ tinh, vòng Tràng Sinh) theo ID, loai hoặc tên chuẩn."""
     main: list[dict[str, Any]] = []
     support: list[dict[str, Any]] = []
     trang_sinh: list[dict[str, Any]] = []
@@ -67,7 +78,8 @@ def split_engine_stars(stars: Any) -> tuple[list[dict[str, Any]], list[dict[str,
             loai_int = int(loai) if loai is not None else None
         except (TypeError, ValueError):
             loai_int = None
-        if sid_int in MAIN_STAR_IDS or loai_int == 1:
+        name = _star_name(star)
+        if sid_int in MAIN_STAR_IDS or loai_int == 1 or name in MAIN_STAR_NAMES:
             main.append(star)
         elif sid_int in TRANG_SINH_IDS or bool(star.get("vong_trang_sinh")):
             trang_sinh.append(star)
@@ -134,7 +146,6 @@ def normalize_engine_chart(chart: Any, *, for_ai: bool = False) -> dict[str, Any
         explicit_support = _list_alias(raw, "phu_tinh", "phuTinh", "phuTinhData")
         explicit_trang = _list_alias(raw, "vong_trang_sinh_data", "vongTrangSinhData")
         raw_all = _list_alias(raw, "sao", "stars", "all_stars")
-
         if explicit_main or explicit_support or explicit_trang:
             main = dedupe_stars(explicit_main)
             support = dedupe_stars(explicit_support)
@@ -149,7 +160,6 @@ def normalize_engine_chart(chart: Any, *, for_ai: bool = False) -> dict[str, Any
                     trang_sinh = raw_trang
         else:
             main, support, trang_sinh = split_engine_stars(raw_all)
-
         item["chinh_tinh"] = main
         item["phu_tinh"] = support
         item["vong_trang_sinh_data"] = trang_sinh
