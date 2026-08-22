@@ -108,7 +108,18 @@ def _save_profile(req: BirthRequest) -> dict[str, Any]:
     try:
         from google_sheets_storage import save_user_profile
         created_at = datetime.now(timezone.utc).astimezone(VN_TZ).isoformat(timespec="seconds")
-        return save_user_profile(user_id=str(uuid.uuid4()), name=req.ten.strip(), ngay_sinh=f"{req.ngay:02d}/{req.thang:02d}/{req.nam:04d}", gio_sinh=str(req.gio_sinh), gioi_tinh=req.gioi_tinh, lich="Dương lịch" if req.duong_lich else "Âm lịch", time_zone=req.time_zone, created_at=created_at)
+        name = req.ten.strip() or "—"
+        birth_date = f"{req.ngay:02d}/{req.thang:02d}/{req.nam:04d}"
+        return save_user_profile(
+            user_id=str(uuid.uuid4()),
+            name=name,
+            ngay_sinh=birth_date,
+            gio_sinh=str(req.gio_sinh),
+            gioi_tinh=req.gioi_tinh,
+            lich="Dương lịch" if req.duong_lich else "Âm lịch",
+            time_zone=req.time_zone,
+            created_at=created_at,
+        )
     except Exception as exc:
         return {"saved": False, "error": f"{type(exc).__name__}: {exc}"}
 
@@ -211,10 +222,14 @@ def _inject_viewing_year_ui(html: str) -> str:
     const oldLoad=window.loadUserProfile;
     window.loadUserProfile=function(){if(typeof oldLoad==='function') oldLoad();const p=JSON.parse(localStorage.getItem('tvai_user_profile_v1')||'null');if(p&&p.viewYear!=null)setViewYear(p.viewYear);else setViewYear(currentYear);};
     const oldSave=window.saveUserProfile;
-    window.saveUserProfile=function(){if(typeof oldSave==='function')oldSave();try{const p=JSON.parse(localStorage.getItem('tvai_user_profile_v1')||'{}');p.viewYear=normalizeYear(viewYear?.value||currentYear);localStorage.setItem('tvai_user_profile_v1',JSON.stringify(p));}catch{}};
-  }catch{}
-  window.lapSo=async function(){byId('status').innerHTML='<div class="msg">Đang lập lá số...</div>';try{window.saveUserProfile?.();const viewingYear=normalizeYear(viewYear?.value||currentYear);const d=await window.call('/api/lap-so',{method:'POST',body:JSON.stringify({ngay:Number(byId('day').value),thang:Number(byId('month').value),nam:Number(byId('year').value),nam_xem:viewingYear,gio_sinh:byId('hour').value,gioi_tinh:byId('gender').value,ten:byId('name').value,duong_lich:byId('calendar').value==='true',time_zone:Number(byId('tz').value)})});window.render(d);window.renderVan10?.(d);byId('status').innerHTML='<div class="msg">Đã lập lá số · Năm xem: '+esc(viewingYear)+'</div>';}catch(e){byId('status').innerHTML='<div class="msg">'+esc(e.message)+'</div>';}};
-  window.askAI=async function(){if(!window.chart)return;const q=byId('question').value.trim();if(!q)return;window.addBubble('user',q);byId('question').value='';byId('askBtn').disabled=true;window.showTyping();try{const viewingYear=normalizeYear(viewYear?.value||currentYear);const d=await window.call('/api/luan-giai',{method:'POST',body:JSON.stringify({ngay:Number(byId('day').value),thang:Number(byId('month').value),nam:Number(byId('year').value),nam_xem:viewingYear,gio_sinh:byId('hour').value,gioi_tinh:byId('gender').value,ten:byId('name').value,duong_lich:byId('calendar').value==='true',time_zone:Number(byId('tz').value),question:q,year:viewingYear})});window.removeTyping();window.addBubble('assistant',d.answer||'Chưa cấu hình AI API key');}catch(e){window.removeTyping();window.addBubble('assistant','⚠️ '+e.message)}finally{byId('askBtn').disabled=false;}};
+    window.saveUserProfile=function(){if(typeof oldSave==='function') oldSave();const p=JSON.parse(localStorage.getItem('tvai_user_profile_v1')||'{}');p.viewYear=normalizeYear(viewYear?.value||currentYear);localStorage.setItem('tvai_user_profile_v1',JSON.stringify(p));};
+    const oldLap=window.lapSo;
+    window.lapSo=async function(){await oldLap();window.renderVan10?.(window.chart);};
+    document.addEventListener('click',e=>{
+      const tab=e.target.closest?.('.tab[data-tab="cach"]');
+      if(tab) setTimeout(observeModifierPanel,0);
+    });
+  }catch(err){console.warn('Vận 10 năm UI patch:',err);}
 })();
 </script>
 '''
