@@ -15,6 +15,9 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -25,9 +28,32 @@ jobs:
         run: python - <<'PY'
 import json
 from pathlib import Path
-for path in Path('.').glob('*.json'):
+for path in Path('.').rglob('*.json'):
     json.loads(path.read_text(encoding='utf-8'))
 print('JSON validation: PASS')
 PY
+      - name: Verify canonical frontend structure
+        shell: python
+        run: |
+          from pathlib import Path
+          import json
+          html=Path('new-ui/index.html').read_text(encoding='utf-8')
+          assert 'href="/new-ui/style.css"' in html
+          assert 'src="/new-ui/app.js"' in html
+          assert 'src="/new-ui/van10.js"' in html
+          assert Path('new-ui/style.css').is_file()
+          assert Path('new-ui/app.js').is_file()
+          assert Path('new-ui/van10.css').is_file()
+          assert Path('new-ui/van10.js').is_file()
+          assert 'api/chat_ui.py' not in Path('vercel.json').read_text(encoding='utf-8')
+          assert 'api/new_ui.py' not in Path('vercel.json').read_text(encoding='utf-8')
+          assert 'move-cach-pha-giam' not in ''.join(str(p) for p in Path('.github/workflows').glob('*.yml'))
+          print('Canonical frontend structure: PASS')
+      - name: Check JavaScript syntax
+        run: |
+          node --check new-ui/app.js
+          node --check new-ui/van10.js
+      - name: Validate Vercel config
+        run: python -m json.tool vercel.json > /dev/null
       - name: Run tests
         run: pytest -q
