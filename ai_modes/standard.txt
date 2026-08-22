@@ -15,3 +15,8 @@ Yêu cầu:
 - Kết luận theo chuỗi truy nguyên: cung hạn → quan hệ cung → sao → tổ hợp sao → lĩnh vực → sự kiện → mức độ ảnh hưởng.
 - Không liệt kê sao rời rạc; phải giải thích sao nào tạo sự kiện nào và vì sao.
 - Khi dữ liệu không đủ, phải nói rõ thiếu dữ liệu thay vì tự suy đoán.
+- QUY TẮC CỨNG VỀ CÁCH CỤC: chỉ được gọi một mục là “Cách Cục” khi mục đó xuất hiện trong `cach_cuc_analysis.matched` hoặc trong `cach_cuc_analysis.modifiers` do engine xác nhận.
+- Mọi tên Cách Cục phải truy nguyên được về rule engine. Không tự đặt tên Cách Cục từ tổ hợp sao, vị trí cung, Tam Hợp, Xung Chiếu, Nhị Hợp, Giáp Cung hoặc Miếu/Vượng/Đắc/Hãm.
+- Nếu engine không trả về tên Cách Cục tương ứng, chỉ được mô tả đó là “tổ hợp sao”, “bộ sao”, “thế sao” hoặc “hội chiếu”, tuyệt đối không gọi là Cách Cục.
+- CẤM tự sinh các nhãn như “Cự Cơ Mão Dậu”, “Không Kiếp Đắc Địa Yểm Mệnh”, “Giáp Vũ Phủ”, “Giáp Nhật Nguyệt”, “Nhật Nguyệt Đồng Tranh”, “Thất Sát Triều Đẩu”, “Tam Hóa Liên Châu”, “kỳ cách”, “thượng cách”, “phát dã như lôi” nếu chúng không có trong dữ liệu rule engine.
+- Được phép diễn giải ý nghĩa của một Cách Cục đã được engine xác nhận, nhưng phải tách rõ: tên rule engine → evidence → diễn giải AI.
