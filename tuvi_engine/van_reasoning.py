@@ -1,29 +1,36 @@
 """Structured reasoning layer for Tử Vi vận hạn.
 
 Module này KHÔNG tự đoán sự kiện bằng AI. Nó biến các tầng vận đã tính thành
-một ``reasoning_context`` có thứ tự, bằng chứng và mức ưu tiên để AI luận giải.
-
-Nguyên tắc:
-1. Xác định tầng thời gian đang xét.
-2. Xác định cung bị kích hoạt ở từng tầng.
-3. Đọc đồng cung trước.
-4. Đọc Tam Hợp + Xung Chiếu.
-5. Đọc Nhị Hợp và Giáp Cung như quan hệ bổ trợ, không thay thế Tam Hợp.
-6. Kiểm tra Tuần/Triệt.
-7. Kiểm tra Can Chi / Tứ Hóa của năm-tháng khi engine đã có dữ liệu.
-8. Chồng các tầng theo trọng số: Nguyên cục -> Đại vận -> Lưu niên ->
-   Tiểu vận -> Lưu nguyệt -> Lưu nhật -> Lưu thời.
-9. Tách ``nền tảng`` khỏi ``kích hoạt`` để tránh luận hạn từ một dấu hiệu đơn lẻ.
+một reasoning_context có thứ tự, bằng chứng và mức ưu tiên để AI luận giải.
 """
 from __future__ import annotations
 
 from typing import Any
+import re
+import unicodedata
 
 BRANCHES = ["Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi", "Thân", "Dậu", "Tuất", "Hợi"]
+
+TAM_PHUONG_GROUPS = (
+    frozenset(("Thân", "Tý", "Thìn")),
+    frozenset(("Dần", "Ngọ", "Tuất")),
+    frozenset(("Tỵ", "Dậu", "Sửu")),
+    frozenset(("Hợi", "Mão", "Mùi")),
+)
+
+NHI_HOP = {
+    frozenset(("Tý", "Sửu")),
+    frozenset(("Hợi", "Dần")),
+    frozenset(("Tuất", "Mão")),
+    frozenset(("Thìn", "Dậu")),
+    frozenset(("Tỵ", "Thân")),
+    frozenset(("Ngọ", "Mùi")),
+}
 
 LAYER_WEIGHTS = {
     "nguyen_cuc": 100,
     "dai_van": 80,
+    "luu_dai_van": 75,
     "luu_nien": 70,
     "tieu_van": 60,
     "luu_nguyet": 45,
@@ -51,9 +58,35 @@ def _norm(s: Any) -> str:
     return str(s or "").strip().casefold()
 
 
-def _branch_index(name: str) -> int | None:
+def _branch_name(value: Any) -> str | None:
+    """Chuẩn hóa Tý/Tỵ và mã nội bộ ty1/ty2 về cùng một tên chuẩn."""
+    if value is None:
+        return None
+    raw = str(value).strip().casefold()
+    direct = {
+        "tý": "Tý", "tỵ": "Tỵ", "sửu": "Sửu", "dần": "Dần", "mão": "Mão",
+        "thìn": "Thìn", "ngọ": "Ngọ", "mùi": "Mùi", "thân": "Thân",
+        "dậu": "Dậu", "tuất": "Tuất", "hợi": "Hợi",
+        "ty1": "Tý", "ty2": "Tỵ", "suu": "Sửu", "dan": "Dần", "mao": "Mão",
+        "thin": "Thìn", "ngo": "Ngọ", "mui": "Mùi", "than": "Thân", "dau": "Dậu",
+        "tuat": "Tuất", "hoi": "Hợi",
+    }
+    if raw in direct:
+        return direct[raw]
+    no_marks = unicodedata.normalize("NFD", raw)
+    no_marks = "".join(c for c in no_marks if unicodedata.category(c) != "Mn")
+    no_marks = re.sub(r"\d+$", "", no_marks)
+    fallback = {
+        "ty": "Tý", "suu": "Sửu", "dan": "Dần", "mao": "Mão", "thin": "Thìn",
+        "ngo": "Ngọ", "mui": "Mùi", "than": "Thân", "dau": "Dậu", "tuat": "Tuất", "hoi": "Hợi",
+    }
+    return fallback.get(no_marks)
+
+
+def _branch_index(name: Any) -> int | None:
+    branch = _branch_name(name)
     try:
-        return BRANCHES.index(name)
+        return BRANCHES.index(branch) if branch else None
     except ValueError:
         return None
 
@@ -73,59 +106,42 @@ def _palace_by_number(chart: dict[str, Any], number: int | None) -> dict[str, An
     return _cung_map(chart).get(int(number))
 
 
-def _palace_by_name(chart: dict[str, Any], name: str) -> dict[str, Any] | None:
-    wanted = _norm(name)
-    for palace in chart.get("12_cung", {}).values():
-        if _norm(palace.get("cung")) == wanted:
-            return palace
-    return None
-
-
-def _palace_by_branch(chart: dict[str, Any], branch: str) -> dict[str, Any] | None:
-    wanted = _norm(branch)
-    for palace in chart.get("12_cung", {}).values():
-        if _norm(palace.get("dia_chi")) == wanted:
-            return palace
-    return None
-
-
 def _stars(palace: dict[str, Any] | None) -> list[str]:
     if not palace:
         return []
-    names: list[str] = []
-    for star in palace.get("sao", []) or []:
-        if isinstance(star, dict) and star.get("ten"):
-            names.append(str(star["ten"]))
-    return names
+    return [str(s["ten"]) for s in palace.get("sao", []) or [] if isinstance(s, dict) and s.get("ten")]
 
 
-def _relation(a: str, b: str) -> str:
-    """Quan hệ theo Địa Chi; Nhị hợp và Giáp cung có định nghĩa riêng."""
-    ia = _branch_index(a)
-    ib = _branch_index(b)
-    if ia is None or ib is None or ia == ib:
-        return "dong_cung" if ia == ib and ia is not None else "khac"
-    d = (ib - ia) % 12
-    if d in (4, 8):
+def _relation(a: Any, b: Any) -> str:
+    """Quan hệ Địa Chi thuần túy: Tam phương, Xung chiếu, Nhị hợp."""
+    a_name = _branch_name(a)
+    b_name = _branch_name(b)
+    ia = _branch_index(a_name)
+    ib = _branch_index(b_name)
+    if a_name is None or b_name is None or ia is None or ib is None:
+        return "khac"
+    if a_name == b_name:
+        return "dong_cung"
+    if any({a_name, b_name}.issubset(group) for group in TAM_PHUONG_GROUPS):
         return "tam_hop"
-    if d == 6:
+    if (ib - ia) % 12 == 6:
         return "xung_chieu"
-    if {a, b} in [
-        {"Tý", "Sửu"}, {"Dần", "Hợi"}, {"Mão", "Tuất"},
-        {"Thìn", "Dậu"}, {"Tỵ", "Thân"}, {"Ngọ", "Mùi"},
-    ]:
+    if frozenset((a_name, b_name)) in NHI_HOP:
         return "nhi_hop"
     return "khac"
 
 
 def _relation_between_palaces(base: dict[str, Any], other: dict[str, Any]) -> str:
-    if base.get("cung_so") == other.get("cung_so"):
+    """Quan hệ đầy đủ giữa hai cung; Giáp cung dùng cung_so +/-1."""
+    base_no = base.get("cung_so")
+    other_no = other.get("cung_so")
+    if base_no == other_no:
         return "dong_cung"
-    if isinstance(base.get("cung_so"), int) and isinstance(other.get("cung_so"), int):
-        diff = (int(other["cung_so"]) - int(base["cung_so"])) % 12
+    if isinstance(base_no, int) and isinstance(other_no, int):
+        diff = (other_no - base_no) % 12
         if diff in (1, 11):
             return "giap_cung"
-    return _relation(str(base.get("dia_chi", "")), str(other.get("dia_chi", "")))
+    return _relation(base.get("dia_chi"), other.get("dia_chi"))
 
 
 def _activated_palace_refs(chart: dict[str, Any], van: dict[str, Any]) -> list[dict[str, Any]]:
@@ -145,8 +161,9 @@ def _activated_palace_refs(chart: dict[str, Any], van: dict[str, Any]) -> list[d
                 "source": data,
             })
 
-    add("luu_nien", van.get("year", {}))
+    add("luu_nien", van.get("luu_nien") or van.get("year", {}))
     add("dai_van", van.get("dai_van", {}).get("dang_xet"))
+    add("luu_dai_van", van.get("luu_dai_van", {}))
     add("tieu_van", van.get("tieu_van", {}))
     add("luu_nguyet", van.get("luu_nguyet", {}))
     add("luu_nhat", van.get("luu_nhat", {}))
@@ -166,23 +183,19 @@ def _interactions(chart: dict[str, Any], target: dict[str, Any]) -> list[dict[st
                 "cung_so": palace.get("cung_so"),
                 "cung": palace.get("cung"),
                 "dia_chi": palace.get("dia_chi"),
+                "dia_chi_chuan": _branch_name(palace.get("dia_chi")),
+                "can_chi": palace.get("can_chi"),
                 "stars": _stars(palace),
             })
     order = {"tam_hop": 0, "xung_chieu": 1, "nhi_hop": 2, "giap_cung": 3}
-    interactions.sort(key=lambda x: order.get(x["quan_he"], 99))
+    interactions.sort(key=lambda x: (order.get(x["quan_he"], 99), int(x.get("cung_so") or 0)))
     return interactions
 
 
 def _tieu_van_tam_phuong_tu_chinh(chart: dict[str, Any], van: dict[str, Any]) -> dict[str, Any]:
-    """Xác định Tam phương Tứ chính của CHÍNH CUNG TIỂU VẬN.
-
-    Đây là nguồn authoritative cho luận hạn. Không lấy Quan/Tài/Tật/Di theo
-    tên chức năng. Trước hết phải lấy đúng vị trí ``cung_so`` của Tiểu vận,
-    sau đó xác định quan hệ hình học từ chính cung đó.
-    """
+    """Tam phương Tứ chính của đúng cung Tiểu vận."""
     tieu = van.get("tieu_van") or {}
-    target_number = tieu.get("cung_so")
-    target = _palace_by_number(chart, target_number)
+    target = _palace_by_number(chart, tieu.get("cung_so"))
     if not target:
         return {"cung_tieu_van": None, "tam_phuong": [], "xung_chieu": None, "nhi_hop": None, "giap_cung": []}
 
@@ -199,6 +212,7 @@ def _tieu_van_tam_phuong_tu_chinh(chart: dict[str, Any], van: dict[str, Any]) ->
             "cung_so": palace.get("cung_so"),
             "cung": palace.get("cung"),
             "dia_chi": palace.get("dia_chi"),
+            "dia_chi_chuan": _branch_name(palace.get("dia_chi")),
             "can_chi": palace.get("can_chi"),
             "stars": _stars(palace),
         }
@@ -219,6 +233,7 @@ def _tieu_van_tam_phuong_tu_chinh(chart: dict[str, Any], van: dict[str, Any]) ->
             "cung_so": target.get("cung_so"),
             "cung": target.get("cung"),
             "dia_chi": target.get("dia_chi"),
+            "dia_chi_chuan": _branch_name(target.get("dia_chi")),
             "can_chi": target.get("can_chi"),
             "stars": _stars(target),
         },
@@ -226,8 +241,13 @@ def _tieu_van_tam_phuong_tu_chinh(chart: dict[str, Any], van: dict[str, Any]) ->
         "xung_chieu": xung_chieu,
         "nhi_hop": nhi_hop,
         "giap_cung": giap_cung,
-        "rule": "Lấy chính cung_so của Tiểu vận; Tam hợp = Địa Chi cách 4/8; Xung chiếu = cách 6; Nhị hợp = cặp Địa Chi cố định; Giáp cung = vị trí cung_so kề nhau.",
-        "anti_confusion": "Không được chọn cung Quan/Tài/Tật/Di chỉ vì tên chức năng; phải xác định quan hệ thực tế từ cung Tiểu vận trước, sau đó mới gắn tên cung chức năng.",
+        "rule": {
+            "tam_phuong": ["Thân-Tý-Thìn", "Dần-Ngọ-Tuất", "Tỵ-Dậu-Sửu", "Hợi-Mão-Mùi"],
+            "xung_chieu": "Cung đối diện cung đang xét, cung_so cách 6; ví dụ Tý-Ngọ, Sửu-Mùi, Dần-Thân.",
+            "giap_cung": "Cung trước và sau của cung gốc, cung_so +1 và -1 theo vòng 12 cung; ví dụ cung Hợi giáp Tý và Tuất.",
+            "nhi_hop": ["Tý-Sửu", "Hợi-Dần", "Tuất-Mão", "Thìn-Dậu", "Tỵ-Thân", "Ngọ-Mùi"],
+        },
+        "anti_confusion": "Không được chọn Quan/Tài/Tật/Di chỉ vì tên chức năng; phải xác định cung thực tế trước rồi mới gắn tên cung chức năng.",
     }
 
 
@@ -236,7 +256,6 @@ def _tuan_triet(palace: dict[str, Any]) -> dict[str, bool]:
 
 
 def build_reasoning_context(chart: dict[str, Any], van: dict[str, Any]) -> dict[str, Any]:
-    """Tạo cây suy luận vận hạn có thể đưa thẳng cho AI."""
     active = _activated_palace_refs(chart, van)
     evidence: list[dict[str, Any]] = []
 
@@ -249,6 +268,7 @@ def build_reasoning_context(chart: dict[str, Any], van: dict[str, Any]) -> dict[
             "cung_so": palace.get("cung_so"),
             "cung": palace.get("cung"),
             "dia_chi": palace.get("dia_chi"),
+            "dia_chi_chuan": _branch_name(palace.get("dia_chi")),
             "chinh_tinh": [s.get("ten") for s in palace.get("chinh_tinh", []) if isinstance(s, dict)],
             "phu_tinh": [s.get("ten") for s in palace.get("phu_tinh", []) if isinstance(s, dict)],
             "stars": _stars(palace),
@@ -263,22 +283,24 @@ def build_reasoning_context(chart: dict[str, Any], van: dict[str, Any]) -> dict[
         "Xác định tuổi/năm và tầng vận đang kích hoạt.",
         "Xác định cung bị kích hoạt ở đúng tầng vận; không thay thế bằng cung chức năng khác.",
         "Đọc đồng cung: chính tinh -> phụ tinh -> sát tinh/bại tinh -> Tứ Hóa/Tuần/Triệt nếu có.",
-        "Với Tiểu vận: bắt buộc lấy chính cung_so của Tiểu vận để xác định Tam phương Tứ chính.",
-        "Tam hợp = hai cung có Địa Chi cách 4 hoặc 8; Xung chiếu = cách 6; Nhị hợp = cặp Địa Chi cố định; Giáp cung = vị trí cung_so kề nhau.",
-        "Chỉ sau khi xác định quan hệ hình học mới gọi tên cung chức năng Quan/Tài/Tật/Di...",
+        "Tam phương phải lấy theo 4 tổ hợp Địa Chi: Thân-Tý-Thìn; Dần-Ngọ-Tuất; Tỵ-Dậu-Sửu; Hợi-Mão-Mùi.",
+        "Xung chiếu là cung đối diện, cung_so cách 6.",
+        "Giáp cung là cung trước và sau của cung gốc, cung_so +1 và -1 theo vòng 12 cung.",
+        "Nhị hợp là các cặp ngang hàng: Tý-Sửu; Hợi-Dần; Tuất-Mão; Thìn-Dậu; Tỵ-Thân; Ngọ-Mùi.",
+        "Chỉ sau khi xác định quan hệ hình học mới gắn tên cung chức năng Quan/Tài/Tật/Di...",
         "Đọc Nhị Hợp và Giáp Cung như lớp bổ trợ.",
-        "Đối chiếu với Mệnh/Thân và các cung chức năng liên quan đến câu hỏi.",
-        "Xét Lưu nguyệt/Lưu nhật/Lưu thời chỉ sau khi nền Đại vận + Lưu niên đã rõ.",
+        "Chồng các tầng: Nguyên cục -> Đại vận -> Lưu Đại vận -> Lưu niên -> Tiểu vận -> Lưu nguyệt -> Lưu nhật -> Lưu thời.",
         "Chỉ kết luận sự kiện khi có hội đủ nền + kích hoạt; không kết luận từ một sao hoặc một quan hệ đơn lẻ.",
     ]
 
     return {
-        "engine": "van_reasoning_v2",
+        "engine": "van_reasoning_v3",
         "workflow": workflow,
         "active_layers": evidence,
         "tieu_van_tam_phuong_tu_chinh": tieu_van_ttp,
         "principles": {
             "dai_van": "lớp nền dài hạn",
+            "luu_dai_van": "lớp chuyển động trong Đại vận",
             "luu_nien": "kích hoạt chủ đề trong năm",
             "tieu_van": "lớp hạn năm theo quy tắc Tiểu vận của hệ thống",
             "luu_nguyet": "kích hoạt theo tháng Tiết khí",
@@ -289,9 +311,10 @@ def build_reasoning_context(chart: dict[str, Any], van: dict[str, Any]) -> dict[
         "anti_error_rules": [
             "Không gọi Giáp Cung là Nhị Hợp.",
             "Không gọi Xung Chiếu là Tam Hợp.",
+            "Không trộn Tam phương với Giáp cung.",
+            "Không chọn cung Quan/Tài/Tật/Di theo tên chức năng thay cho vị trí cung thực tế.",
             "Không dùng Lưu nguyệt để phủ định nền Đại vận nếu không có bằng chứng tầng cao.",
             "Không luận một sự kiện chắc chắn chỉ từ một sát tinh.",
             "Phải ghi rõ lớp nào tạo nền và lớp nào tạo kích hoạt.",
-            "Tam phương Tứ chính của Tiểu vận phải lấy theo vị trí thực tế của cung Tiểu vận, không lấy theo danh xưng Quan/Tài/Tật/Di.",
         ],
     }
