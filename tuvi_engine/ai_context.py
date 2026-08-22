@@ -69,19 +69,46 @@ def build_ai_context(
     cach_cuc_catalog = load_cach_cuc()
     filtered = build_filtered_ai_payload(chart, van or {}, question)
     scope = _question_scope(question)
+    matched_cach_cuc = _normalize_matched_cach_cuc(chart, cach_cuc_catalog)
+    modifiers = deepcopy(chart.get("cach_cuc_modifiers", [])) if isinstance(chart.get("cach_cuc_modifiers", []), list) else []
     context: dict[str, Any] = {
-        "schema_version": "3.2-ai-context-filtered-four-layer",
+        "schema_version": "3.3-ai-context-filtered-four-layer-authoritative-cach-cuc",
         "input": deepcopy(chart.get("input", {})),
         "thien_ban": deepcopy(chart.get("thien_ban", {})),
         "palaces": deepcopy(filtered.get("selected_palaces", {})),
         "ai_payload": filtered,
         "relationship_knowledge": load_relationship_knowledge(),
-        "matched_cach_cuc": _normalize_matched_cach_cuc(chart, cach_cuc_catalog),
+        "matched_cach_cuc": matched_cach_cuc,
+        "confirmed_cach_cuc": {
+            "count": len(matched_cach_cuc),
+            "items": matched_cach_cuc,
+            "source": "tuvi_engine.rules.cach_cuc.detect_cach_cuc",
+            "authoritative": True,
+            "allow_ai_invented_names": False,
+        },
+        "cach_cuc_modifiers": {
+            "count": len(modifiers),
+            "items": modifiers,
+            "source": "tuvi_engine.rules.modifiers.detect_cach_cuc_modifiers",
+            "authoritative": True,
+            "display_with_cach_cuc": True,
+            "allow_ai_invented_names": False,
+        },
         "question_scope": scope,
         "reasoning_contract": {
             "ai_payload_source_of_truth": "ai_payload",
             "use_only_provided_relations": True,
             "use_only_matched_cach_cuc": True,
+            "use_only_confirmed_cach_cuc": True,
+            "confirmed_cach_cuc_source_of_truth": "confirmed_cach_cuc",
+            "cach_cuc_count_source_of_truth": "confirmed_cach_cuc.count",
+            "cach_cuc_name_must_match_engine": True,
+            "never_invent_cach_cuc_names": True,
+            "never_upgrade_star_pattern_to_cach_cuc": True,
+            "allow_only_engine_confirmed_cach_cuc": True,
+            "modifiers_are_engine_confirmed_data": True,
+            "display_modifiers_as_cach_cuc_items_without_good_bad_label": True,
+            "do_not_claim_zero_cach_cuc_when_confirmed_cach_cuc_count_positive": True,
             "do_not_invent_missing_stars_or_relations": True,
             "separate_facts_from_interpretation": True,
             "dynamic_van_source_of_truth": "van_han",
