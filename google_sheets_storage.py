@@ -49,11 +49,7 @@ def _text(value: Any, default: str = "—") -> str:
 
 
 def _birth_date_text(value: str) -> str:
-    """Normalize birth date to explicit text such as 11/11/1996.
-
-    The append call uses RAW so Google Sheets stores the value literally and
-    does not convert it into a serial date such as 35380.
-    """
+    """Normalize birth date to explicit text such as 11/11/1996."""
     return _text(value)
 
 
@@ -71,17 +67,30 @@ def save_user_profile(*, user_id: str, name: str, ngay_sinh: str, gio_sinh: str,
             body={"values": [HEADERS]},
         ).execute()
 
-    birth_date = _birth_date_text(ngay_sinh)
+    stable_id = _text(user_id)
     row = [
-        _text(user_id),
+        stable_id,
         _text(name),
-        birth_date,
+        _birth_date_text(ngay_sinh),
         _text(gio_sinh),
         _text(gioi_tinh),
         _text(lich),
         _text(time_zone),
         _text(created_at),
     ]
+
+    # Upsert by ID: do not create a new row every time the same chart is opened.
+    existing = values_api.get(spreadsheetId=spreadsheet_id, range="A2:A").execute().get("values", [])
+    row_number = next((idx + 2 for idx, values in enumerate(existing) if values and str(values[0]).strip() == stable_id), None)
+    if row_number is not None:
+        result = values_api.update(
+            spreadsheetId=spreadsheet_id,
+            range=f"A{row_number}:H{row_number}",
+            valueInputOption="RAW",
+            body={"values": [row]},
+        ).execute()
+        return {"saved": True, "action": "updated", "row": row_number, "updated_range": result.get("updatedRange")}
+
     result = values_api.append(
         spreadsheetId=spreadsheet_id,
         range="A:H",
@@ -89,4 +98,4 @@ def save_user_profile(*, user_id: str, name: str, ngay_sinh: str, gio_sinh: str,
         insertDataOption="INSERT_ROWS",
         body={"values": [row]},
     ).execute()
-    return {"saved": True, "updated_range": result.get("updates", {}).get("updatedRange")}
+    return {"saved": True, "action": "created", "updated_range": result.get("updates", {}).get("updatedRange")}
